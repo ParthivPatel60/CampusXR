@@ -158,9 +158,15 @@ This is strictly less configuration overhead, which matters at 3am in a hackatho
   --color-academic-blue: #0047AB;
   --color-nav-green: #10B981;
   --color-amber-glow: #F59E0B;
-  --color-glass-border: rgba(209, 213, 219, 0.4);
-  --blur-glass: 35px;
-  --radius-glass: 14px;
+  --color-primary-accent: #FF0000;
+  --color-secondary-accent: #FF9900;
+  --color-glass-surface: rgba(196, 196, 196, 0.2);
+  --color-glass-border: #FFFFFF;
+  --bg-gradient-glass: linear-gradient(247.52deg, rgba(255, 0, 0, 0.17) 1.52%, rgba(255, 255, 255, 0) 96.99%);
+  --shadow-glass-inset: inset -2px -2px 100px rgba(255, 255, 255, 0.1), inset 2px 2px 100px rgba(66, 66, 66, 0.1);
+  --blur-glass: 25px;
+  --radius-glass: 39px;
+  --radius-glass-inner: 50px;
 }
 ```
 
