@@ -12,20 +12,20 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
     mm.add("(max-width: 767px)", () => {
       // Mobile - Slide up
       if (showInfoPanel) {
-        gsap.to(infoPanelRef.current, { 
+        gsap.to(infoPanelRef.current, {
           x: 0,
           y: 0,
-          opacity: 1, 
-          duration: 0.7, 
+          opacity: 1,
+          duration: 0.7,
           ease: 'power4.out',
           pointerEvents: 'auto'
         });
       } else {
-        gsap.to(infoPanelRef.current, { 
+        gsap.to(infoPanelRef.current, {
           x: 0,
           y: 60,
-          opacity: 0, 
-          duration: 0.4, 
+          opacity: 0,
+          duration: 0.4,
           ease: 'power3.in',
           pointerEvents: 'none'
         });
@@ -35,20 +35,20 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
     mm.add("(min-width: 768px)", () => {
       // Desktop - Slide in from right (more pronounced slide)
       if (showInfoPanel) {
-        gsap.to(infoPanelRef.current, { 
-          x: 0, 
+        gsap.to(infoPanelRef.current, {
+          x: 0,
           y: 0,
-          opacity: 1, 
-          duration: 0.8, 
+          opacity: 1,
+          duration: 0.8,
           ease: 'power4.out',
           pointerEvents: 'auto'
         });
       } else {
-        gsap.to(infoPanelRef.current, { 
+        gsap.to(infoPanelRef.current, {
           x: 100, // Move further right when hidden
           y: 0,
-          opacity: 0, 
-          duration: 0.4, 
+          opacity: 0,
+          duration: 0.4,
           ease: 'power3.in',
           pointerEvents: 'none'
         });
@@ -58,26 +58,68 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
     return () => mm.revert();
   }, [showInfoPanel]);
 
+  const G_BG = 'linear-gradient(247.52deg, rgba(108, 99, 255, 0.17) 1.52%, rgba(255, 255, 255, 0) 96.99%)';
+  const G_BLUR = 'blur(25px)';
+  const G_SHADOW = 'rgba(255, 255, 255, 0.1) -2px -2px 100px inset, rgba(66, 66, 66, 0.1) 2px 2px 100px inset';
+
   return (
-    <div 
-      ref={infoPanelRef} 
-      className="fixed bottom-[12vh] left-[5vw] md:absolute md:top-[80px] md:bottom-[24px] md:left-auto md:right-[20px] w-[90vw] md:w-[360px] max-h-[85vh] md:max-h-none opacity-0 z-50 flex flex-col pointer-events-none translate-y-[60px] md:translate-y-0 md:translate-x-[100px]"
-    >
-      <div 
-        className="w-full h-full flex flex-col p-[24px] gap-4 border border-white/20 rounded-[39px] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.4)] pointer-events-auto"
+    <>
+      {/* ═══ INFO SIDE PANEL ══════════════════════════════════════════════ */}
+      <div
+        ref={infoPanelRef}
+        className="pointer-events-none"
         style={{
-          background: 'linear-gradient(247.52deg, rgba(108, 99, 255, 0.17) 1.52%, rgba(255, 255, 255, 0) 96.99%)',
-          backdropFilter: 'blur(25px)',
-          boxShadow: 'rgba(255, 255, 255, 0.1) -2px -2px 100px inset, rgba(66, 66, 66, 0.1) 2px 2px 100px inset, rgba(0, 0, 0, 0.4) 0px 24px 64px'
+          position: 'absolute',
+          top: '80px',
+          bottom: '24px',
+          right: '20px',
+          width: '360px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          zIndex: 50,
+          transform: 'translateX(110%)',
+          opacity: 0,
+          /* Glass (unchanged) */
+          background: G_BG,
+          backdropFilter: G_BLUR,
+          WebkitBackdropFilter: G_BLUR,
+          boxShadow: `${G_SHADOW}, 0 24px 64px rgba(0,0,0,0.40)`,
+          borderRadius: '39px',
+          border: '1px solid rgba(255,255,255,0.20)',
+          overflow: 'hidden',
         }}
       >
-        <div className="flex items-center justify-between w-full shrink-0">
-          <span className="text-[#a8a2ff] text-[10px] font-semibold uppercase tracking-[0.16em]">
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{
+            color: 'rgba(168,162,255,1)',
+            fontSize: '10px',
+            fontWeight: 600,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+          }}>
             Point of Interest
           </span>
-          <button 
-            onClick={() => setShowInfoPanel(false)} 
-            className="w-8 h-8 rounded-full bg-white/10 border-[1.5px] border-white/25 flex items-center justify-center text-white/65 hover:bg-white/20 hover:text-white transition-all duration-150 cursor-pointer outline-none shrink-0"
+          <button
+            onClick={() => setShowInfoPanel(false)}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.10)',
+              border: '1.5px solid rgba(255,255,255,0.25)',
+              color: 'rgba(255,255,255,0.65)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              outline: 'none',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.20)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -85,25 +127,52 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
             </svg>
           </button>
         </div>
-        
+
+        {/* Image */}
         {activeHotspot?.image && (
-          <img 
-            src={activeHotspot.image} 
-            alt={activeHotspot.text} 
-            className="rounded-[20px] object-cover h-[180px] w-full border border-white/10 shadow-lg shrink-0 mt-1" 
+          <img
+            src={activeHotspot.image}
+            alt={activeHotspot.text}
+            style={{
+              borderRadius: '20px',
+              objectFit: 'cover',
+              height: '180px',
+              width: '100%',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}
           />
         )}
 
-        <h2 className="text-white text-[24px] font-bold font-sans tracking-tight leading-[1.2] m-0 shrink-0 mt-1">
-          {activeHotspot?.text || 'Information'}
+        {/* Title */}
+        <h2 style={{
+          margin: 0,
+          color: '#ffffff',
+          fontSize: '20px',
+          fontWeight: 700,
+          letterSpacing: '-0.3px',
+          fontFamily: 'Montserrat, sans-serif',
+          lineHeight: 1.2,
+        }}>
+          {activeHotspot?.text || 'Hotspot Detail'}
         </h2>
-        
-        <div className="h-[1px] w-full bg-white/10 shrink-0 my-1" />
-        
-        <p className="text-white/70 text-[14px] leading-[1.65] font-normal overflow-y-auto w-full flex-1 overscroll-contain hidden-scrollbar m-0">
-          {activeHotspot?.description || 'Click on a coloured marker in the panorama to explore this location and see detailed information about the room, equipment, and facilities.'}
+
+        {/* Divider */}
+        <div style={{ height: '1px', background: 'rgba(255,255,255,0.14)', flexShrink: 0 }} />
+
+        {/* Description */}
+        <p style={{
+          margin: 0,
+          color: 'rgba(255,255,255,0.68)',
+          fontSize: '14px',
+          fontWeight: 400,
+          lineHeight: 1.65,
+          overflowY: 'auto',
+          flex: 1,
+        }}>
+          {activeHotspot?.description ||
+            'Click on a coloured marker in the panorama to explore this location and see detailed information about the room, equipment, and facilities.'}
         </p>
       </div>
-    </div>
+    </>
   );
 }
