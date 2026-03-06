@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../firebase";
+import { auth } from "@/firebase";
 
 export default function AdminRoute({ children }) {
   const [status, setStatus] = useState("loading");

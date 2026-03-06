@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────────── */
 const GLASS_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';

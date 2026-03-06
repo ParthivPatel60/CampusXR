@@ -14,7 +14,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 // ── Inline hotspot styles — mirrors HotspotMarker.jsx design tokens ──────────

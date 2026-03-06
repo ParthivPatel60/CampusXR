@@ -25,7 +25,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React from 'react';
 import NavbarGlass from '../ui/NavbarGlass';
 import SideControls from '../ui/SideControls';
 import LocationLabel from '../ui/LocationLabel';

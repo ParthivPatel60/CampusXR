@@ -16,7 +16,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 /* ─── Glass tokens (UNCHANGED) ────────────────────────────────────────────── */
 const PANEL_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';

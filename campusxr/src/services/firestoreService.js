@@ -54,12 +54,20 @@ export const getRooms = async (deptId) => {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
+export const updateDepartment = async (deptId, data) => {
+  await updateDoc(doc(db, "departments", deptId), data);
+};
+
 export const addRoom = async (deptId, roomData) => {
   const ref = await addDoc(
     collection(db, "departments", deptId, "rooms"),
     roomData
   );
   return ref.id;
+};
+
+export const updateRoom = async (deptId, roomId, data) => {
+  await updateDoc(doc(db, "departments", deptId, "rooms", roomId), data);
 };
 
 export const deleteRoom = async (deptId, roomId) => {

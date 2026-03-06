@@ -11,8 +11,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React from 'react';
-
 /* Location pin SVG */
 function PinIcon() {
     return (

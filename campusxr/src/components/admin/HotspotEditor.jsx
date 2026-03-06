@@ -1,510 +1,739 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import * as THREE from 'three';
-import { getHotspots, addHotspot, deleteHotspot } from '../../services/firestoreService';
-import { uploadImageToCloudinary } from '../../cloudinary';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Plus, Pencil, Trash2, Loader2, MapPin, X, Navigation, Info, Target, ArrowLeft } from 'lucide-react';
+import { getHotspots, addHotspot, updateHotspot, deleteHotspot, getRooms } from '@/services/firestoreService';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Dialog, DialogContent,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
-const TYPE_STYLES = {
-  info:       { ring: '#38BDF8', dot: '#0EA5E9', glow: 'rgba(56,189,248,0.60)',  icon: 'ℹ', label: 'Info' },
-  navigation: { ring: '#34D399', dot: '#10B981', glow: 'rgba(52,211,153,0.60)', icon: '›', label: 'Navigation' },
-};
+// ── Zod schema ────────────────────────────────────────────────────────────────
+const hotspotSchema = z.object({
+  label:        z.string().min(2, 'Label must be at least 2 characters').max(100, 'Too long'),
+  type:         z.enum(['info', 'navigation']),
+  description:  z.string().max(1000, 'Too long'),
+  targetDeptId: z.string().optional(),
+  targetRoomId: z.string().optional(),
+}).refine(
+  d => d.type !== 'navigation' || (d.targetDeptId && d.targetRoomId),
+  { message: 'Navigation hotspot requires a target room', path: ['targetRoomId'] }
+);
 
-const labelStyle = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4,
-};
+function pitchYawToXYZ(pitch, yaw, r = 490) {
+  const p = (pitch * Math.PI) / 180;
+  const y = (yaw   * Math.PI) / 180;
+  return new THREE.Vector3(
+    r * Math.cos(p) * Math.sin(y),
+    r * Math.sin(p),
+    r * Math.cos(p) * Math.cos(y),
+  );
+}
 
-const inputStyle = {
-  width: '100%', padding: '8px 10px', borderRadius: 8,
-  border: '1px solid #e2e8f0', fontSize: 13, color: '#1e293b',
-  outline: 'none', background: '#fff', fontFamily: 'inherit',
-  boxSizing: 'border-box',
-};
+export default function HotspotEditor({ room, deptId, departments, onClose }) {
+  const mountRef    = useRef(null);
+  const rendererRef = useRef(null);
+  const sceneRef    = useRef(null);
+  const cameraRef   = useRef(null);
+  const controlsRef = useRef(null);
+  const markersRef  = useRef([]);
+  const rafRef      = useRef(null);
 
-export default function HotspotEditor({ room, deptId, departments, allRoomsByDept, onClose }) {
-  const [hotspots, setHotspots]           = useState([]);
-  const [placing, setPlacing]             = useState(false);
-  const [pendingPos, setPendingPos]       = useState(null); // { pitch, yaw }
-  const [formText, setFormText]           = useState('');
-  const [formType, setFormType]           = useState('info');
-  const [formDesc, setFormDesc]           = useState('');
-  const [formImageFile, setFormImageFile] = useState(null);
-  const [formTargetDeptId, setFormTargetDeptId] = useState(deptId);
-  const [formTargetRoomId, setFormTargetRoomId] = useState('');
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
+  const [hotspots, setHotspots]               = useState([]);
+  const [loading, setLoading]                 = useState(true);
+  const [placing, setPlacing]                 = useState(false);
+  const [pendingPitch, setPendingPitch]       = useState(null);
+  const [pendingYaw, setPendingYaw]           = useState(null);
+  const [formOpen, setFormOpen]               = useState(false);
+  const [editingHs, setEditingHs]             = useState(null);
+  const [deletingHs, setDeletingHs]           = useState(null);
+  const [deleting, setDeleting]               = useState(false);
+  const [targetDeptRooms, setTargetDeptRooms] = useState([]);
 
-  const mountRef             = useRef(null);
-  const cameraRef            = useRef(null);
-  const markersContainerRef  = useRef(null);
-  const placingRef           = useRef(false);
-  const hotspotsRef          = useRef([]);
+  const {
+    register, handleSubmit, control, watch, reset,
+    setValue, formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(hotspotSchema),
+    defaultValues: { label: '', type: 'info', description: '', targetDeptId: '', targetRoomId: '' },
+  });
 
-  // keep refs in sync
-  useEffect(() => { placingRef.current = placing; }, [placing]);
-  useEffect(() => { hotspotsRef.current = hotspots; }, [hotspots]);
+  const watchType       = watch('type');
+  const watchTargetDept = watch('targetDeptId');
 
-  // Load existing hotspots
   useEffect(() => {
-    if (deptId && room?.id) {
-      getHotspots(deptId, room.id).then(setHotspots);
+    if (!watchTargetDept) { setTargetDeptRooms([]); return; }
+    getRooms(watchTargetDept).then(setTargetDeptRooms).catch(() => setTargetDeptRooms([]));
+  }, [watchTargetDept]);
+
+  const fetchHotspots = useCallback(async () => {
+    setLoading(true);
+    try {
+      const hs = await getHotspots(deptId, room.id);
+      setHotspots(hs);
+    } catch (e) {
+      toast.error('Failed to load hotspots: ' + e.message);
+    } finally {
+      setLoading(false);
     }
-  }, [deptId, room?.id]);
+  }, [deptId, room.id]);
 
-  // Rebuild DOM marker elements whenever hotspot list changes
-  useEffect(() => {
-    const container = markersContainerRef.current;
-    if (!container) return;
-    while (container.firstChild) container.removeChild(container.firstChild);
-    hotspotsRef.current.forEach(hs => {
-      const c = TYPE_STYLES[hs.type] ?? TYPE_STYLES.info;
-      const el = document.createElement('div');
-      Object.assign(el.style, {
-        position: 'absolute',
-        transform: 'translate(-50%, -50%)',
-        display: 'none',
-        pointerEvents: 'none',
-      });
-      el.dataset.hsId = hs.id;
-      el.innerHTML = `
-        <span style="display:flex;align-items:center;justify-content:center;
-          width:32px;height:32px;border-radius:50%;
-          border:2.5px solid ${c.ring};
-          background:rgba(255,255,255,0.12);
-          box-shadow:0 0 12px ${c.glow};">
-          <span style="width:12px;height:12px;border-radius:50%;
-            background:${c.dot};color:#fff;font-size:8px;font-weight:800;
-            display:flex;align-items:center;justify-content:center;">
-            ${c.icon}
-          </span>
-        </span>`;
-      container.appendChild(el);
-    });
-  }, [hotspots]);
+  useEffect(() => { fetchHotspots(); }, [fetchHotspots]);
 
-  // Three.js panorama viewer
+  // ── Three.js setup ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!room?.imageURL || !mountRef.current) return;
-    const mount = mountRef.current;
+    const el = mountRef.current;
+    if (!el) return;
+
+    const initW = el.clientWidth  || 800;
+    const initH = el.clientHeight || 450;
+
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(75, initW / initH, 1, 1100);
+    camera.position.set(0, 0, 0.001);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
-    mount.appendChild(renderer.domElement);
+    renderer.setSize(initW, initH);
+    el.appendChild(renderer.domElement);
 
-    const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
-    camera.position.set(0, 0, 0.001);
-    cameraRef.current = camera;
-
-    const geo = new THREE.SphereGeometry(500, 60, 40);
-    geo.scale(-1, 1, 1);
-    const texture = new THREE.TextureLoader().load(room.imageURL);
+    const geo    = new THREE.SphereGeometry(500, 60, 40);
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+    const texture = loader.load(
+      room.imageURL || '',
+      undefined, undefined,
+      () => toast.error("Could not load panorama image."),
+    );
     texture.colorSpace = THREE.SRGBColorSpace;
-    scene.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture })));
+    const mat    = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
+    const sphere = new THREE.Mesh(geo, mat);
+    scene.add(sphere);
 
-    // Drag-to-look
-    let isDown = false, prevX = 0, prevY = 0, dragDist = 0;
-    let lon = 0, lat = 0, lonTarget = 0, latTarget = 0;
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom  = false;
+    controls.enablePan   = false;
+    controls.rotateSpeed = -0.3;
+    controls.target.set(0, 0, 0);
+    controls.update();
 
-    const onPointerDown = (e) => {
-      isDown = true; dragDist = 0;
-      prevX = e.clientX; prevY = e.clientY;
-    };
-    const onPointerMove = (e) => {
-      if (!isDown) return;
-      const dx = e.clientX - prevX, dy = e.clientY - prevY;
-      dragDist += Math.abs(dx) + Math.abs(dy);
-      if (!placingRef.current) {
-        lonTarget -= dx * 0.2;
-        latTarget  = Math.max(-85, Math.min(85, latTarget + dy * 0.2));
-      }
-      prevX = e.clientX; prevY = e.clientY;
-    };
-    const onPointerUp = (e) => {
-      if (!isDown) return;
-      isDown = false;
-      if (placingRef.current && dragDist < 5 && cameraRef.current) {
-        const rect   = mount.getBoundingClientRect();
-        const ndcX   = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-        const ndcY   = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-        const rc     = new THREE.Raycaster();
-        rc.setFromCamera({ x: ndcX, y: ndcY }, cameraRef.current);
-        const dir    = rc.ray.direction;
-        const pitch  = 90 - Math.acos(Math.max(-1, Math.min(1, dir.y))) * (180 / Math.PI);
-        const yaw    = Math.atan2(dir.z, dir.x) * (180 / Math.PI);
-        setPendingPos({ pitch, yaw });
-        setPlacing(false);
-      }
-    };
-    const onWheel = (e) => {
-      camera.fov = Math.max(30, Math.min(100, camera.fov + e.deltaY * 0.05));
-      camera.updateProjectionMatrix();
-    };
+    sceneRef.current    = scene;
+    cameraRef.current   = camera;
+    rendererRef.current = renderer;
+    controlsRef.current = controls;
 
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
-    renderer.domElement.addEventListener('pointermove', onPointerMove);
-    renderer.domElement.addEventListener('pointerup',   onPointerUp);
-    renderer.domElement.addEventListener('wheel',       onWheel, { passive: true });
-
-    const onResize = () => {
-      const nw = mount.clientWidth, nh = mount.clientHeight;
-      renderer.setSize(nw, nh);
-      camera.aspect = nw / nh;
-      camera.updateProjectionMatrix();
-    };
-    window.addEventListener('resize', onResize);
-
-    const _pv = new THREE.Vector3();
-    let animId;
     const animate = () => {
-      animId = requestAnimationFrame(animate);
-      lon += (lonTarget - lon) * 0.08;
-      lat += (latTarget - lat) * 0.08;
-      const phi   = THREE.MathUtils.degToRad(90 - lat);
-      const theta = THREE.MathUtils.degToRad(lon);
-      camera.lookAt(
-        500 * Math.sin(phi) * Math.cos(theta),
-        500 * Math.cos(phi),
-        500 * Math.sin(phi) * Math.sin(theta),
-      );
+      rafRef.current = requestAnimationFrame(animate);
+      controls.update();
       renderer.render(scene, camera);
-
-      // Project hotspot markers into screen space
-      const container = markersContainerRef.current;
-      if (container) {
-        const cw = mount.clientWidth, ch = mount.clientHeight;
-        const hsList = hotspotsRef.current;
-        const elList = container.children;
-        for (let i = 0; i < elList.length && i < hsList.length; i++) {
-          const hs = hsList[i];
-          const el = elList[i];
-          const hsPhi   = THREE.MathUtils.degToRad(90 - (hs.pitch ?? 0));
-          const hsTheta = THREE.MathUtils.degToRad(hs.yaw ?? 0);
-          _pv.set(
-            500 * Math.sin(hsPhi) * Math.cos(hsTheta),
-            500 * Math.cos(hsPhi),
-            500 * Math.sin(hsPhi) * Math.sin(hsTheta),
-          );
-          _pv.project(camera);
-          if (_pv.z <= 1 && Math.abs(_pv.x) <= 1.05 && Math.abs(_pv.y) <= 1.05) {
-            el.style.left    = `${(_pv.x  + 1) / 2 * cw}px`;
-            el.style.top     = `${(1 - _pv.y) / 2 * ch}px`;
-            el.style.display = '';
-          } else {
-            el.style.display = 'none';
-          }
-        }
-      }
     };
     animate();
 
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', onResize);
-      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
-      renderer.domElement.removeEventListener('pointermove', onPointerMove);
-      renderer.domElement.removeEventListener('pointerup',   onPointerUp);
-      renderer.domElement.removeEventListener('wheel',       onWheel);
-      renderer.dispose();
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
-    };
-  }, [room?.imageURL]);
-
-  // Save a new hotspot
-  const handleSave = async () => {
-    if (!formText.trim()) { setError('Hotspot label is required.'); return; }
-    if (formType === 'navigation' && !formTargetRoomId) { setError('Please select a target room.'); return; }
-    if (!pendingPos) return;
-    setSaving(true); setError('');
-    try {
-      let imageUrl = '';
-      if (formImageFile) {
-        const { secure_url } = await uploadImageToCloudinary(formImageFile);
-        imageUrl = secure_url;
+    // ResizeObserver correctly handles Dialog animation completion (no 0×0 bug)
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
       }
-      const data = {
-        text:        formText.trim(),
-        type:        formType,
-        description: formDesc.trim(),
-        pitch:       pendingPos.pitch,
-        yaw:         pendingPos.yaw,
-        ...(imageUrl ? { imageUrl } : {}),
-        ...(formType === 'navigation' ? {
-          targetDeptId: formTargetDeptId || deptId,
-          targetRoomId: formTargetRoomId,
-        } : {}),
-      };
-      await addHotspot(deptId, room.id, data);
-      setHotspots(await getHotspots(deptId, room.id));
-      // reset form
-      setPendingPos(null); setFormText(''); setFormDesc('');
-      setFormImageFile(null); setFormType('info');
-      setFormTargetDeptId(deptId); setFormTargetRoomId('');
-    } catch {
-      setError('Failed to save hotspot. Please try again.');
-    } finally {
-      setSaving(false);
+    });
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+      controls.dispose();
+      renderer.dispose();
+      if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
+    };
+  }, [room.imageURL]);
+
+  // ── Sync markers ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    markersRef.current.forEach(m => scene.remove(m));
+    markersRef.current = [];
+
+    hotspots.forEach(hs => {
+      const canvas  = document.createElement('canvas');
+      canvas.width  = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(32, 32, 28, 0, Math.PI * 2);
+      ctx.fillStyle = hs.type === 'navigation' ? '#22c55e' : '#3b82f6';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      const tex    = new THREE.CanvasTexture(canvas);
+      const mat    = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(22, 22, 1);
+      sprite.position.copy(pitchYawToXYZ(hs.pitch ?? 0, hs.yaw ?? 0));
+      sprite.userData.hsId = hs.id;
+      scene.add(sprite);
+      markersRef.current.push(sprite);
+    });
+  }, [hotspots]);
+
+  // ── Click to place ────────────────────────────────────────────────────────
+  const handleCanvasClick = (e) => {
+    if (!placing) return;
+    const el   = mountRef.current;
+    const rect = el.getBoundingClientRect();
+    const mx = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+    const my = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera({ x: mx, y: my }, cameraRef.current);
+    const hits = raycaster.intersectObjects(sceneRef.current.children, false);
+    const hit  = hits.find(h => h.object.geometry instanceof THREE.SphereGeometry);
+    if (!hit) return;
+
+    const { x, y, z } = hit.point;
+    const r     = Math.sqrt(x * x + y * y + z * z);
+    const pitch = Math.round((Math.asin(y / r) * 180) / Math.PI);
+    const yaw   = Math.round((Math.atan2(x, z) * 180) / Math.PI);
+    setPendingPitch(pitch);
+    setPendingYaw(yaw);
+    setPlacing(false);
+    toast.success(`Position set — pitch ${pitch}°, yaw ${yaw}°`);
+  };
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  const openAdd = () => {
+    setEditingHs(null);
+    setPendingPitch(null);
+    setPendingYaw(null);
+    reset({ label: '', type: 'info', description: '', targetDeptId: '', targetRoomId: '' });
+    setFormOpen(true);
+  };
+
+  const openEdit = (hs) => {
+    setEditingHs(hs);
+    setPendingPitch(hs.pitch ?? 0);
+    setPendingYaw(hs.yaw   ?? 0);
+    reset({
+      label:        hs.label,
+      type:         hs.type,
+      description:  hs.description ?? '',
+      targetDeptId: hs.targetDeptId ?? '',
+      targetRoomId: hs.targetRoomId ?? '',
+    });
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingHs(null);
+    setPlacing(false);
+    setPendingPitch(null);
+    setPendingYaw(null);
+    reset({ label: '', type: 'info', description: '', targetDeptId: '', targetRoomId: '' });
+  };
+
+  const onSubmit = async (data) => {
+    if (pendingPitch === null || pendingYaw === null) {
+      toast.error('Please set a position on the panorama first.');
+      return;
+    }
+    const payload = {
+      label:       data.label.trim(),
+      type:        data.type,
+      description: data.description.trim(),
+      pitch:       pendingPitch,
+      yaw:         pendingYaw,
+      ...(data.type === 'navigation' ? {
+        targetDeptId: data.targetDeptId,
+        targetRoomId: data.targetRoomId,
+      } : {}),
+    };
+    try {
+      if (editingHs) {
+        await updateHotspot(deptId, room.id, editingHs.id, payload);
+        toast.success('Hotspot updated');
+      } else {
+        await addHotspot(deptId, room.id, payload);
+        toast.success('Hotspot added');
+      }
+      closeForm();
+      fetchHotspots();
+    } catch (e) {
+      toast.error(e.message || 'Save failed');
     }
   };
 
-  const handleDelete = async (hsId) => {
-    await deleteHotspot(deptId, room.id, hsId);
-    setHotspots(prev => prev.filter(h => h.id !== hsId));
+  const handleDelete = async () => {
+    if (!deletingHs) return;
+    setDeleting(true);
+    try {
+      await deleteHotspot(deptId, room.id, deletingHs.id);
+      toast.success('Hotspot deleted');
+      setDeletingHs(null);
+      fetchHotspots();
+    } catch (e) {
+      toast.error(e.message || 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
   };
 
-  const targetDeptRooms = allRoomsByDept[formTargetDeptId] || [];
-
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', background: '#0f0f1a' }}>
-
-      {/* ── LEFT SIDEBAR: hotspot list ───────────────────────────────────── */}
-      <div style={{
-        width: 280, background: '#fff', display: 'flex', flexDirection: 'column',
-        boxShadow: '2px 0 8px rgba(0,0,0,0.15)', zIndex: 10, overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
-          <button
-            onClick={onClose}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              color: '#64748b', fontSize: 13, fontWeight: 600,
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: 0, marginBottom: 12,
-            }}
-          >
-            ← Back to Rooms
-          </button>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>{room.name}</h2>
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Hotspot Editor</p>
-        </div>
-
-        {/* Place button */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-          <button
-            onClick={() => { setPlacing(v => !v); setPendingPos(null); }}
-            style={{
-              width: '100%', padding: '10px 0', borderRadius: 8,
-              background: placing ? '#4f46e5' : '#3b82f6',
-              color: '#fff', fontWeight: 700, fontSize: 13,
-              border: 'none', cursor: 'pointer', transition: 'background 0.15s',
-            }}
-          >
-            {placing ? '🎯 Click panorama to place…' : '+ Place Hotspot'}
-          </button>
-          {placing && (
-            <p style={{ textAlign: 'center', fontSize: 11, color: '#64748b', marginTop: 6 }}>
-              Pan to look around, then click
-            </p>
-          )}
-        </div>
-
-        {/* Hotspot list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Hotspots ({hotspots.length})
-          </p>
-          {hotspots.length === 0 && (
-            <p style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'center', marginTop: 24 }}>
-              No hotspots yet.<br />Click &ldquo;Place Hotspot&rdquo; to add one.
-            </p>
-          )}
-          {hotspots.map(hs => {
-            const c = TYPE_STYLES[hs.type] ?? TYPE_STYLES.info;
-            return (
-              <div key={hs.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 8,
-                background: '#f8fafc', border: '1px solid #e2e8f0', marginBottom: 8,
-              }}>
-                <span style={{
-                  width: 26, height: 26, borderRadius: '50%', background: c.dot,
-                  color: '#fff', fontSize: 10, fontWeight: 800,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  {c.icon}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {hs.text}
-                  </p>
-                  <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>
-                    {c.label} · p:{hs.pitch?.toFixed(1)}° y:{hs.yaw?.toFixed(1)}°
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDelete(hs.id)}
-                  style={{ color: '#ef4444', fontSize: 11, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}
-                >
-                  ✕
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── CENTRE: PANORAMA VIEWER ──────────────────────────────────────── */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {placing && (
-          <div style={{
-            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(79,70,229,0.90)', backdropFilter: 'blur(8px)',
-            color: '#fff', padding: '8px 20px', borderRadius: 30,
-            fontSize: 13, fontWeight: 600, pointerEvents: 'none', zIndex: 20,
-            border: '1px solid rgba(255,255,255,0.25)',
-          }}>
-            🎯 Click anywhere on the panorama to place a hotspot
+    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+      {/*
+        CRITICAL LAYOUT NOTES:
+        - w-[95vw] max-w-7xl → large dialog that fills most of viewport
+        - h-[92vh] → tall enough for panorama to be meaningful
+        - flex flex-col → header on top, body fills remaining height
+        - overflow-hidden → clips Three.js canvas at dialog boundary
+        - The panorama div (mountRef) uses flex-1 min-w-0 so it takes all
+          available horizontal space after the 340px side panel.
+        - The side panel NEVER unmounts — only its inner content switches
+          between the list and the form. This keeps the panorama always visible.
+      */}
+      <DialogContent
+        className="w-[95vw] max-w-7xl h-[92vh] flex flex-col p-0 gap-0 overflow-hidden"
+        hideCloseButton
+      >
+        {/* ── Top header — always visible ── */}
+        <div className="h-14 px-5 flex items-center justify-between border-b shrink-0 bg-card z-10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <MapPin size={15} className="text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight">Hotspot Editor</p>
+              <p className="text-xs text-muted-foreground truncate">{room.name}</p>
+            </div>
           </div>
-        )}
+          <div className="flex items-center gap-2 shrink-0 ml-4">
+            {placing && (
+              <Badge className="text-xs bg-amber-100 text-amber-700 border border-amber-300 animate-pulse select-none">
+                Click on panorama to place
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <X size={15} />
+            </Button>
+          </div>
+        </div>
 
-        {/* Three.js canvas mount */}
-        <div
-          ref={mountRef}
-          style={{ position: 'absolute', inset: 0, cursor: placing ? 'crosshair' : 'grab' }}
-        >
-          {/* Hotspot marker overlay */}
+        {/* ── Body: panorama + side panel side by side ── */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+
+          {/* ── Panorama — always mounted, always fills left column ── */}
           <div
-            ref={markersContainerRef}
-            style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}
-          />
-        </div>
-
-        {!room?.imageURL && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 14 }}>
-            No panorama image for this room.
-          </div>
-        )}
-      </div>
-
-      {/* ── RIGHT PANEL: new-hotspot form ───────────────────────────────── */}
-      {pendingPos && (
-        <div style={{
-          width: 310, background: '#fff', boxShadow: '-2px 0 8px rgba(0,0,0,0.12)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 10,
-        }}>
-          <div style={{ padding: '20px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>New Hotspot</h3>
-            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-              pitch {pendingPos.pitch.toFixed(1)}° · yaw {pendingPos.yaw.toFixed(1)}°
-            </p>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Type toggle */}
-            <div>
-              <label style={labelStyle}>Type</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['info', 'navigation'].map(t => {
-                  const c     = TYPE_STYLES[t];
-                  const sel   = formType === t;
-                  const bdr   = sel ? c.dot : '#e2e8f0';
-                  const bg    = sel ? (t === 'info' ? '#e0f2fe' : '#d1fae5') : '#fff';
-                  const color = sel ? (t === 'info' ? '#0369a1' : '#065f46') : '#64748b';
-                  return (
-                    <button key={t} onClick={() => setFormType(t)} style={{
-                      flex: 1, padding: '9px 4px', borderRadius: 8,
-                      fontSize: 12, fontWeight: 600,
-                      border: `2px solid ${bdr}`, background: bg, color,
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}>
-                      {t === 'info' ? 'ℹ Info' : '› Navigation'}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Label */}
-            <div>
-              <label style={labelStyle}>Label *</label>
-              <input
-                type="text"
-                placeholder="e.g. MakerBot Replicator+"
-                value={formText}
-                onChange={e => setFormText(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            {/* Description (info only) */}
-            {formType === 'info' && (
-              <div>
-                <label style={labelStyle}>Description</label>
-                <textarea
-                  placeholder="Equipment details, location info…"
-                  value={formDesc}
-                  onChange={e => setFormDesc(e.target.value)}
-                  rows={3}
-                  style={{ ...inputStyle, resize: 'vertical' }}
-                />
+            ref={mountRef}
+            onClick={handleCanvasClick}
+            className={cn(
+              'flex-1 min-w-0 bg-black relative overflow-hidden',
+              placing && 'cursor-crosshair ring-2 ring-inset ring-amber-400'
+            )}
+          >
+            {/* Place-mode overlay banner */}
+            {placing && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                <div className="bg-black/75 backdrop-blur-sm text-white text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-xl">
+                  <Target size={12} className="text-amber-400" />
+                  Click anywhere on the panorama to place the hotspot
+                </div>
               </div>
             )}
 
-            {/* Navigation target (navigation only) */}
-            {formType === 'navigation' && (
+            {/* Subtle hint when form is open but not yet placing */}
+            {formOpen && !placing && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                <div className="bg-black/55 backdrop-blur-sm text-white/80 text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                  <MapPin size={11} />
+                  Drag to explore · use &ldquo;Place on Panorama&rdquo; in the panel to pin a position
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Right side panel — fixed width, always rendered ── */}
+          <div className="w-[340px] shrink-0 border-l flex flex-col bg-card overflow-hidden">
+
+            {/* ━━ PANEL VIEW A: Hotspot list ━━ */}
+            {!formOpen && (
               <>
-                <div>
-                  <label style={labelStyle}>Target Department</label>
-                  <select
-                    value={formTargetDeptId}
-                    onChange={e => { setFormTargetDeptId(e.target.value); setFormTargetRoomId(''); }}
-                    style={inputStyle}
-                  >
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                <div className="h-14 px-5 flex items-center justify-between border-b shrink-0">
+                  <div>
+                    <p className="text-sm font-semibold">Hotspots</p>
+                    <p className="text-xs text-muted-foreground">
+                      {loading
+                        ? 'Loading…'
+                        : `${hotspots.length} hotspot${hotspots.length !== 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={openAdd} className="h-8 gap-1.5 shrink-0">
+                    <Plus size={13} /> Add
+                  </Button>
                 </div>
-                <div>
-                  <label style={labelStyle}>Target Room</label>
-                  <select
-                    value={formTargetRoomId}
-                    onChange={e => setFormTargetRoomId(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">— select room —</option>
-                    {targetDeptRooms.map(r => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
+
+                <ScrollArea className="flex-1">
+                  {loading && (
+                    <div className="flex items-center gap-2.5 p-5 text-sm text-muted-foreground">
+                      <Loader2 size={14} className="animate-spin" /> Loading hotspots…
+                    </div>
+                  )}
+
+                  {!loading && hotspots.length === 0 && (
+                    <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <MapPin size={20} className="text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">No hotspots yet</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Click &ldquo;Add&rdquo; to place your first hotspot on the panorama.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="divide-y">
+                    {hotspots.map(hs => (
+                      <div
+                        key={hs.id}
+                        className="px-5 py-4 flex items-start gap-3 group hover:bg-muted/30 transition-colors"
+                      >
+                        <div className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                          hs.type === 'navigation'
+                            ? 'bg-green-100 dark:bg-green-950'
+                            : 'bg-blue-100 dark:bg-blue-950'
+                        )}>
+                          {hs.type === 'navigation'
+                            ? <Navigation size={12} className="text-green-600 dark:text-green-400" />
+                            : <Info size={12} className="text-blue-600 dark:text-blue-400" />
+                          }
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate leading-tight">{hs.label}</p>
+                          <Badge
+                            variant={hs.type === 'navigation' ? 'default' : 'secondary'}
+                            className="text-[10px] mt-1 px-1.5 py-0"
+                          >
+                            {hs.type}
+                          </Badge>
+                          {hs.description && (
+                            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
+                              {hs.description}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground/60 font-mono mt-1.5">
+                            {Number(hs.pitch ?? 0).toFixed(1)}° / {Number(hs.yaw ?? 0).toFixed(1)}°
+                          </p>
+                        </div>
+
+                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEdit(hs)}
+                          >
+                            <Pencil size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeletingHs(hs)}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                </div>
+                  </div>
+                </ScrollArea>
               </>
             )}
 
-            {/* Optional image (info only) */}
-            {formType === 'info' && (
-              <div>
-                <label style={labelStyle}>Image (optional)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={e => setFormImageFile(e.target.files[0] || null)}
-                  style={{ fontSize: 12, color: '#475569' }}
-                />
-              </div>
+            {/* ━━ PANEL VIEW B: Add / Edit form ━━ */}
+            {formOpen && (
+              <>
+                {/* Form sub-header */}
+                <div className="h-14 px-4 flex items-center gap-3 border-b shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={closeForm}
+                    title="Back to list"
+                  >
+                    <ArrowLeft size={15} />
+                  </Button>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-tight">
+                      {editingHs ? 'Edit Hotspot' : 'New Hotspot'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {editingHs
+                        ? 'Update details then click Update'
+                        : 'Fill details, then place on panorama'}
+                    </p>
+                  </div>
+                </div>
+
+                <ScrollArea className="flex-1">
+                  <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-5">
+
+                    {/* Label */}
+                    <div className="space-y-2">
+                      <Label htmlFor="hs-label" className="text-sm font-medium">
+                        Label <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="hs-label"
+                        placeholder="e.g. IT Lab 1"
+                        className="h-10"
+                        {...register('label')}
+                      />
+                      {errors.label && (
+                        <p className="text-xs text-destructive">{errors.label.message}</p>
+                      )}
+                    </div>
+
+                    {/* Type */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Type</Label>
+                      <Controller
+                        name="type"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={v => {
+                              field.onChange(v);
+                              setValue('targetDeptId', '');
+                              setValue('targetRoomId', '');
+                            }}
+                          >
+                            <SelectTrigger className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="info">
+                                <span className="flex items-center gap-2">
+                                  <Info size={13} className="text-blue-500" /> Info
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="navigation">
+                                <span className="flex items-center gap-2">
+                                  <Navigation size={13} className="text-green-500" /> Navigation
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label htmlFor="hs-desc" className="text-sm font-medium">Description</Label>
+                      <Textarea
+                        id="hs-desc"
+                        rows={3}
+                        placeholder="Describe this location or what this hotspot leads to…"
+                        className="resize-none text-sm"
+                        {...register('description')}
+                      />
+                      {errors.description && (
+                        <p className="text-xs text-destructive">{errors.description.message}</p>
+                      )}
+                    </div>
+
+                    {/* Navigation targets */}
+                    {watchType === 'navigation' && (
+                      <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          Navigation Target
+                        </p>
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            Department <span className="text-destructive">*</span>
+                          </Label>
+                          <Controller
+                            name="targetDeptId"
+                            control={control}
+                            render={({ field }) => (
+                              <Select
+                                value={field.value}
+                                onValueChange={v => { field.onChange(v); setValue('targetRoomId', ''); }}
+                              >
+                                <SelectTrigger className="h-10 bg-background">
+                                  <SelectValue placeholder="Select department…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {departments.map(d => (
+                                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            Room <span className="text-destructive">*</span>
+                          </Label>
+                          <Controller
+                            name="targetRoomId"
+                            control={control}
+                            render={({ field }) => (
+                              <Select
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                disabled={!watchTargetDept}
+                              >
+                                <SelectTrigger className="h-10 bg-background">
+                                  <SelectValue placeholder="Select room…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {targetDeptRooms.map(r => (
+                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                          {errors.targetRoomId && (
+                            <p className="text-xs text-destructive">{errors.targetRoomId.message}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* ── Position section ── */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Position on Panorama</Label>
+
+                      {pendingPitch !== null && pendingYaw !== null ? (
+                        <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 p-3">
+                          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                            Position set ✓
+                          </p>
+                          <p className="text-xs text-emerald-600 dark:text-emerald-500 font-mono">
+                            pitch {Number(pendingPitch).toFixed(1)}° / yaw {Number(pendingYaw).toFixed(1)}°
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            No position set. Click the button below, then click on the panorama to the left.
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        type="button"
+                        variant={placing ? 'default' : 'outline'}
+                        className={cn(
+                          'w-full h-10 gap-2 transition-colors',
+                          placing && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent'
+                        )}
+                        onClick={() => setPlacing(p => !p)}
+                      >
+                        <MapPin size={14} />
+                        {placing
+                          ? 'Cancel — click panorama to place'
+                          : pendingPitch !== null
+                            ? 'Reposition on Panorama'
+                            : 'Place on Panorama'}
+                      </Button>
+                    </div>
+
+                    <Separator />
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pb-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1 h-10"
+                        onClick={closeForm}
+                        disabled={isSubmitting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 h-10"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting && <Loader2 size={13} className="mr-1.5 animate-spin" />}
+                        {editingHs ? 'Update' : 'Add Hotspot'}
+                      </Button>
+                    </div>
+                  </form>
+                </ScrollArea>
+              </>
             )}
 
-            {error && <p style={{ color: '#ef4444', fontSize: 12, margin: 0 }}>{error}</p>}
-          </div>
+          </div>{/* /side panel */}
+        </div>{/* /body */}
+      </DialogContent>
 
-          {/* Save / Cancel */}
-          <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => { setPendingPos(null); setError(''); }}
-              style={{ flex: 1, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}
-            >
+      {/* ── Delete confirmation ── */}
+      <AlertDialog open={!!deletingHs} onOpenChange={v => { if (!v) setDeletingHs(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <Trash2 size={16} className="text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-base">
+                Delete &ldquo;{deletingHs?.label}&rdquo;?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm leading-relaxed">
+              This hotspot will be permanently removed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 mt-2">
+            <AlertDialogCancel disabled={deleting} className="min-w-[80px]">
               Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ flex: 2, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 min-w-[100px]"
             >
-              {saving ? 'Saving…' : 'Save Hotspot'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+              {deleting && <Loader2 size={14} className="mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Dialog>
   );
 }

@@ -20,13 +20,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
-import ViewerOverlay from '../components/layout/ViewerOverlay';
-import PanoramaViewer from '../components/viewer/PanoramaViewer';
-import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
+import ViewerOverlay from '@/components/layout/ViewerOverlay';
+import PanoramaViewer from '@/components/viewer/PanoramaViewer';
+import { getDepartments, getRooms, getHotspots } from '@/services/firestoreService';
 
 gsap.registerPlugin(useGSAP);
 
@@ -96,6 +96,7 @@ export default function UserTourPage() {
   const infoPanelRef = useRef(null);
   const toggleRef = useRef(null);
   const viewerRef = useRef(null);
+  const pendingRoomIdRef = useRef(null); // target room when switching dept via nav hotspot
 
   /* ── Three.js camera handlers ────────────────────────────────────────────── */
   const handleZoomIn = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.max(30, c.fov - 10); c.updateProjectionMatrix(); };
@@ -133,7 +134,10 @@ export default function UserTourPage() {
     if (!activeDeptId) return;
     getRooms(activeDeptId).then((r) => {
       setRooms(r);
-      setActiveRoom(r.length > 0 ? r[0] : null);
+      const pending = pendingRoomIdRef.current;
+      pendingRoomIdRef.current = null;
+      const target = pending ? r.find(room => room.id === pending) : null;
+      setActiveRoom(target || (r.length > 0 ? r[0] : null));
     });
   }, [activeDeptId]);
 
@@ -149,7 +153,11 @@ export default function UserTourPage() {
     else if (hs.type === 'navigation' && hs.targetRoomId) {
       if (hs.targetDeptId && hs.targetDeptId !== activeDeptId) {
         const targetDept = departments.find(d => d.id === hs.targetDeptId);
-        if (targetDept) { setActiveDept(targetDept.name); setActiveDeptId(hs.targetDeptId); }
+        if (targetDept) {
+          pendingRoomIdRef.current = hs.targetRoomId;
+          setActiveDept(targetDept.name);
+          setActiveDeptId(hs.targetDeptId);
+        }
       } else {
         const target = rooms.find(r => r.id === hs.targetRoomId);
         if (target) setActiveRoom(target);
