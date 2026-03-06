@@ -45,15 +45,24 @@ The platform operates in two rendering modes:
 
 ## 2.2 Glassmorphism Surface Design
 
-All overlay UI elements — the bottom navigation bar, info side panel, search dropdowns, and the admin hotspot editor popup — use the following CSS glass material treatment:
+All overlay UI elements — the bottom navigation bar, info side panel, search dropdowns, and the admin hotspot editor popup — use the following CSS glass material treatment based on the provided template:
 
-| CSS Property | Value |
-| --- | --- |
-| background | linear-gradient(62.42deg, rgba(255,255,255,0.1) 20.61%, rgba(255,255,255,0) 82.27%) |
-| backdrop-filter | blur(35px) |
-| filter | drop-shadow(2px 4px 30px rgba(0,0,0,0.1)) |
-| border-radius | 14px |
-| border | 1px solid rgba(209,213,219,0.4) |
+```css
+/* Base Glass Panel Layer */
+background: linear-gradient(247.52deg, rgba(255, 0, 0, 0.17) 1.52%, rgba(255, 255, 255, 0) 96.99%);
+box-shadow: inset -2px -2px 100px rgba(255, 255, 255, 0.1), inset 2px 2px 100px rgba(66, 66, 66, 0.1);
+backdrop-filter: blur(25px);
+border-radius: 39px;
+
+/* Interactive Elements (Buttons/Inputs) */
+background: rgba(196, 196, 196, 0.2);
+border: 3px solid #FFFFFF;
+border-radius: 50px;
+
+/* Accents / Notifications */
+/* Primary Accent */ background: #FF0000;
+/* Secondary Accent */ background: #FF9900;
+```
 
 
 
