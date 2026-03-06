@@ -14,9 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import {
-  Dialog, DialogContent,
-} from '@/components/ui/dialog';
+
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -116,6 +114,7 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
     el.appendChild(renderer.domElement);
 
     const geo    = new THREE.SphereGeometry(500, 60, 40);
+    geo.scale(-1, 1, 1); // flip normals inward without mirroring the texture
     const loader = new THREE.TextureLoader();
     loader.crossOrigin = 'anonymous';
     const texture = loader.load(
@@ -124,7 +123,7 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
       () => toast.error("Could not load panorama image."),
     );
     texture.colorSpace = THREE.SRGBColorSpace;
-    const mat    = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
+    const mat    = new THREE.MeshBasicMaterial({ map: texture });
     const sphere = new THREE.Mesh(geo, mat);
     scene.add(sphere);
 
@@ -201,6 +200,10 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
   // ── Click to place ────────────────────────────────────────────────────────
   const handleCanvasClick = (e) => {
     if (!placing) return;
+    if (!cameraRef.current) {
+      toast.error('Panorama not ready yet — please wait a moment.');
+      return;
+    }
     const el   = mountRef.current;
     const rect = el.getBoundingClientRect();
     const mx = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
@@ -215,7 +218,9 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
     const { x, y, z } = hit.point;
     const r     = Math.sqrt(x * x + y * y + z * z);
     const pitch = Math.round((Math.asin(y / r) * 180) / Math.PI);
-    const yaw   = Math.round((Math.atan2(x, z) * 180) / Math.PI);
+    // geometry.scale(-1,1,1) negates hit.point.x, so negate it back to keep
+    // the same yaw convention as the stored Firestore data.
+    const yaw   = Math.round((Math.atan2(-x, z) * 180) / Math.PI);
     setPendingPitch(pitch);
     setPendingYaw(yaw);
     setPlacing(false);
@@ -301,21 +306,18 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
   };
 
   return (
-    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-      {/*
-        CRITICAL LAYOUT NOTES:
-        - w-[95vw] max-w-7xl → large dialog that fills most of viewport
-        - h-[92vh] → tall enough for panorama to be meaningful
-        - flex flex-col → header on top, body fills remaining height
-        - overflow-hidden → clips Three.js canvas at dialog boundary
-        - The panorama div (mountRef) uses flex-1 min-w-0 so it takes all
-          available horizontal space after the 340px side panel.
-        - The side panel NEVER unmounts — only its inner content switches
-          between the list and the form. This keeps the panorama always visible.
-      */}
-      <DialogContent
-        className="w-[95vw] max-w-7xl h-[92vh] flex flex-col p-0 gap-0 overflow-hidden"
-        hideCloseButton
+    <>
+      {/* ── Backdrop ── */}
+      <div
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* ── Panel ── */}
+      <div
+        className="fixed inset-4 z-50 flex flex-col bg-card rounded-xl shadow-2xl overflow-hidden ring-1 ring-foreground/10"
+        onClick={e => e.stopPropagation()}
       >
         {/* ── Top header — always visible ── */}
         <div className="h-14 px-5 flex items-center justify-between border-b shrink-0 bg-card z-10">
@@ -701,9 +703,9 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
 
           </div>{/* /side panel */}
         </div>{/* /body */}
-      </DialogContent>
+      </div>{/* /panel */}
 
-      {/* ── Delete confirmation ── */}
+      {/* ── Delete confirmation — renders in its own Portal above the overlay ── */}
       <AlertDialog open={!!deletingHs} onOpenChange={v => { if (!v) setDeletingHs(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -734,6 +736,6 @@ export default function HotspotEditor({ room, deptId, departments, onClose }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </>
   );
 }

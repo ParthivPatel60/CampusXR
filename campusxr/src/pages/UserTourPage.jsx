@@ -503,7 +503,7 @@ export default function UserTourPage() {
         {activeHotspot?.image && (
           <img
             src={activeHotspot.image}
-            alt={activeHotspot.text}
+            alt={activeHotspot.label || activeHotspot.text || ''}
             style={{
               borderRadius: '20px',
               objectFit: 'cover',
@@ -524,7 +524,7 @@ export default function UserTourPage() {
           fontFamily: 'Montserrat, sans-serif',
           lineHeight: 1.2,
         }}>
-          {activeHotspot?.text || 'Hotspot Detail'}
+          {activeHotspot?.label || activeHotspot?.text || 'Hotspot Detail'}
         </h2>
 
         {/* Divider */}

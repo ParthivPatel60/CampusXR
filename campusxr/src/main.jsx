@@ -2,10 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
-import UserTourPage from './pages/UserTourPage.jsx'
-import LoginPage from './pages/admin/LoginPage.jsx'
-import AdminPanel from './pages/admin/AdminPanel.jsx'
-import AdminRoute from './components/admin/AdminRoute.jsx'
+import UserTourPage from '@/pages/UserTourPage.jsx'
+import LoginPage from '@/pages/admin/LoginPage.jsx'
+import AdminPanel from '@/pages/admin/AdminPanel.jsx'
+import AdminRoute from '@/components/admin/AdminRoute.jsx'
+import { Toaster } from '@/components/ui/sonner'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')).render(
           }
         />
       </Routes>
+      <Toaster richColors position="bottom-right" />
     </BrowserRouter>
   </StrictMode>,
 )

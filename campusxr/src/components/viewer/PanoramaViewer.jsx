@@ -26,7 +26,7 @@ const TYPE_STYLES = {
 /** Build a single hotspot marker DOM element matching HotspotMarker.jsx visuals. */
 function buildMarkerEl(hs, onClickCb) {
     const c = TYPE_STYLES[hs.type] ?? TYPE_STYLES.navigation;
-    const label = hs.text || 'Hotspot';
+    const label = hs.label || hs.text || 'Hotspot';
 
     const btn = document.createElement('button');
     btn.setAttribute('aria-label', label);

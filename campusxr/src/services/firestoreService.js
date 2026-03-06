@@ -7,7 +7,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "@/firebase";
 
 // ---------------------------------------------------------------------------
 // Departments — top-level collection: departments/{deptId}
