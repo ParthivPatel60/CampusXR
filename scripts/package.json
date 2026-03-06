@@ -1,0 +1,17 @@
+{
+  "name": "campusxr-seed",
+  "version": "1.0.0",
+  "description": "One-time bulk seeding script for CampusXR — uploads 360° images to Cloudinary and writes metadata to Firestore",
+  "main": "seed.js",
+  "scripts": {
+    "seed": "node seed.js",
+    "seed:dry": "node seed.js --dry-run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cloudinary": "^2.5.1",
+    "firebase-admin": "^13.0.0"
+  }
+}

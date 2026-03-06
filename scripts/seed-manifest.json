@@ -1,0 +1,402 @@
+{
+  "_comment": "CampusXR seed manifest — edit before running seed.js",
+  "_imagePath": "All imagePath values are relative to scripts/images/. Copy your 27 jpg files there.",
+
+  "_tourFlow": [
+    "ENTRY: Gate-1 (Textile Building)",
+    "Gate-1 ──► Parking ──► Chemical ──► mechWorkshop  [JUNCTION A]",
+    "Gate-1 ──► admin-1  (cross-building, start of Admin path)",
+    "",
+    "JUNCTION A — mechWorkshop:",
+    "  ├─ Branch 1: mechWorkshop ──► icTriangle  [leaf]",
+    "  └─ Branch 2: mechWorkshop ──► IT3-D1-entrance ──► ITLab-1  [JUNCTION B]",
+    "",
+    "JUNCTION B — ITLab-1:",
+    "  ├─ Path B1: ITLab-1 ──► mca-Lab ──► ItClassroom",
+    "  │             mca-Lab ──► Terrace  (cross-dept → Electronics Bldg) [leaf]",
+    "  └─ Path B2: ITLab-1 ──► itStaff-entrance ──► itStaff-interior ──► Lab5-entrance ──► Lab5",
+    "             (cross-dept → Electronics Bldg) [leaf]",
+    "",
+    "Admin Building linear path:",
+    "  admin-1 ──► admin-2 ──► admin-3 ──► architechture  [JUNCTION C]",
+    "",
+    "JUNCTION C — architechture:",
+    "  ├─ Branch A: architechture ──► Dome ──► Amphitheatre  (cross-dept → Dome & Cafeteria) [leaf]",
+    "  ├─ Branch B: architechture ──► Canteen  (cross-dept → Dome & Cafeteria) [leaf]",
+    "  └─ Branch C: architechture ──► CivilTriangle  (cross-dept → CO Building)",
+    "               CivilTriangle ──► XeroxCorner ──► Library-entrance ──► Library-1 ──► Library-2 ──► readingHall  [leaf]"
+  ],
+
+  "departments": [
+    {
+      "deptKey": "admin-building",
+      "name": "Admin Building",
+      "description": "Administrative offices and the central architectural hub of the campus",
+      "rooms": [
+        {
+          "roomKey": "admin-1",
+          "name": "Admin Block – Entrance",
+          "imagePath": "./images/admin-1.jpg",
+          "sortOrder": 1
+        },
+        {
+          "roomKey": "admin-2",
+          "name": "Admin Block – Corridor",
+          "imagePath": "./images/admin-2.jpg",
+          "sortOrder": 2
+        },
+        {
+          "roomKey": "admin-3",
+          "name": "Admin Block – Interior",
+          "imagePath": "./images/Admin-3.jpg",
+          "sortOrder": 3
+        },
+        {
+          "roomKey": "architechture",
+          "name": "Architecture Junction",
+          "imagePath": "./images/architechture.jpg",
+          "sortOrder": 4,
+          "_note": "Central junction — branches lead to Dome, Canteen, and CO Building"
+        }
+      ]
+    },
+    {
+      "deptKey": "dome-and-cafeteria",
+      "name": "Dome and Cafeteria",
+      "description": "The iconic campus dome, open-air amphitheatre and the campus canteen",
+      "rooms": [
+        {
+          "roomKey": "dome",
+          "name": "Dome",
+          "imagePath": "./images/Dome.jpg",
+          "sortOrder": 1
+        },
+        {
+          "roomKey": "amphitheatre",
+          "name": "Amphitheatre",
+          "imagePath": "./images/Amphitheatre.jpg",
+          "sortOrder": 2
+        },
+        {
+          "roomKey": "canteen",
+          "name": "Canteen",
+          "imagePath": "./images/Canteen.jpg",
+          "sortOrder": 3,
+          "_note": "Reached via a separate branch from architechture"
+        }
+      ]
+    },
+    {
+      "deptKey": "textile-building",
+      "name": "Textile Building",
+      "description": "Main campus gate, parking, mechanical workshop, IT labs and classrooms",
+      "rooms": [
+        {
+          "roomKey": "gate-1",
+          "name": "Campus Gate",
+          "imagePath": "./images/Gate-1.jpg",
+          "sortOrder": 1,
+          "_note": "Primary campus entry point — tour start"
+        },
+        {
+          "roomKey": "parking",
+          "name": "Parking Area",
+          "imagePath": "./images/Parking.jpg",
+          "sortOrder": 2
+        },
+        {
+          "roomKey": "chemical",
+          "name": "Chemical Block",
+          "imagePath": "./images/Chemical.jpg",
+          "sortOrder": 3
+        },
+        {
+          "roomKey": "mech-workshop",
+          "name": "Mechanical Workshop",
+          "imagePath": "./images/mechWorkshop.jpg",
+          "sortOrder": 4,
+          "_note": "Junction A — two outgoing navigation hotspots"
+        },
+        {
+          "roomKey": "ic-triangle",
+          "name": "IC Triangle",
+          "imagePath": "./images/icTriangle.jpg",
+          "sortOrder": 5,
+          "_note": "Branch 1 from mechWorkshop — leaf node"
+        },
+        {
+          "roomKey": "it3-d1-entrance",
+          "name": "IT Block 3 – D1 Entrance",
+          "imagePath": "./images/IT3-D1-entrance.jpg",
+          "sortOrder": 6
+        },
+        {
+          "roomKey": "it-lab-1",
+          "name": "IT Lab 1",
+          "imagePath": "./images/ITLab-1.jpg",
+          "sortOrder": 7,
+          "_note": "Junction B — two outgoing paths (mca-Lab path and itStaff path)"
+        },
+        {
+          "roomKey": "mca-lab",
+          "name": "MCA Lab",
+          "imagePath": "./images/mca-Lab.jpg",
+          "sortOrder": 8,
+          "_note": "Has two outgoing hotspots: ItClassroom (within dept) and Terrace (cross-dept → Electronics)"
+        },
+        {
+          "roomKey": "it-classroom",
+          "name": "IT Classroom",
+          "imagePath": "./images/ItClassroom.jpg",
+          "sortOrder": 9
+        }
+      ]
+    },
+    {
+      "deptKey": "electronics-building",
+      "name": "Electronics Building",
+      "description": "IT staff rooms, computer labs and the rooftop terrace",
+      "rooms": [
+        {
+          "roomKey": "it-staff-entrance",
+          "name": "IT Staff Entrance",
+          "imagePath": "./images/itStaff-entrance.jpg",
+          "sortOrder": 1,
+          "_note": "Reached from ITLab-1 (cross-dept) — Branch B2 start"
+        },
+        {
+          "roomKey": "it-staff-interior",
+          "name": "IT Staff Interior",
+          "imagePath": "./images/itStaff-interirore.jpg",
+          "sortOrder": 2
+        },
+        {
+          "roomKey": "lab5-entrance",
+          "name": "Lab 5 Entrance",
+          "imagePath": "./images/Lab5-entrance.jpg",
+          "sortOrder": 3
+        },
+        {
+          "roomKey": "lab5",
+          "name": "Lab 5",
+          "imagePath": "./images/Lab5.jpg",
+          "sortOrder": 4
+        },
+        {
+          "roomKey": "terrace",
+          "name": "Terrace",
+          "imagePath": "./images/Terrace.jpg",
+          "sortOrder": 5,
+          "_note": "Reached from mca-Lab (cross-dept) — Branch B1 leaf"
+        }
+      ]
+    },
+    {
+      "deptKey": "co-building",
+      "name": "CO Building",
+      "description": "Civil and computer engineering triangle, Xerox corner, library and reading hall",
+      "rooms": [
+        {
+          "roomKey": "civil-triangle",
+          "name": "Civil Triangle",
+          "imagePath": "./images/CivilTriangle.jpg",
+          "sortOrder": 1,
+          "_note": "Reached from architechture (cross-dept) — Branch C start"
+        },
+        {
+          "roomKey": "xerox-corner",
+          "name": "Xerox Corner",
+          "imagePath": "./images/XeroxCorner.jpg",
+          "sortOrder": 2
+        },
+        {
+          "roomKey": "library-entrance",
+          "name": "Library Entrance",
+          "imagePath": "./images/Library-entrance.jpg",
+          "sortOrder": 3
+        },
+        {
+          "roomKey": "library-1",
+          "name": "Library – View 1",
+          "imagePath": "./images/Library-1.jpg",
+          "sortOrder": 4
+        },
+        {
+          "roomKey": "library-2",
+          "name": "Library – View 2",
+          "imagePath": "./images/Library-2.jpg",
+          "sortOrder": 5
+        },
+        {
+          "roomKey": "reading-hall",
+          "name": "Reading Hall",
+          "imagePath": "./images/readingHall.jpg",
+          "sortOrder": 6
+        }
+      ]
+    }
+  ],
+
+  "navigationGraph": {
+    "_description": "All navigation hotspot EDGES to author in Admin → Hotspot Editor. Hotspot pitch/yaw are captured using 'Capture from current view' in the admin panel — do NOT need to be filled manually.",
+    "_legend": "type=navigation uses targetRoomId + targetDeptId (same-dept omit targetDeptId). type=info uses text + description + optional image.",
+    "edges": [
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "gate-1" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "parking" },
+        "hotspotText": "Parking Area",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "gate-1" },
+        "to":   { "deptKey": "admin-building",     "roomKey": "admin-1" },
+        "hotspotText": "Admin Building",
+        "direction": "cross-dept"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "parking" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "chemical" },
+        "hotspotText": "Chemical Block",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "chemical" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "mech-workshop" },
+        "hotspotText": "Mechanical Workshop",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "mech-workshop" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "ic-triangle" },
+        "hotspotText": "IC Triangle",
+        "direction": "branch-A"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "mech-workshop" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "it3-d1-entrance" },
+        "hotspotText": "IT Block 3",
+        "direction": "branch-B"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "it3-d1-entrance" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "it-lab-1" },
+        "hotspotText": "IT Lab 1",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "it-lab-1" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "mca-lab" },
+        "hotspotText": "MCA Lab",
+        "direction": "branch-B1"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "it-lab-1" },
+        "to":   { "deptKey": "electronics-building", "roomKey": "it-staff-entrance" },
+        "hotspotText": "IT Staff Room",
+        "direction": "branch-B2-cross-dept"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "mca-lab" },
+        "to":   { "deptKey": "textile-building",   "roomKey": "it-classroom" },
+        "hotspotText": "IT Classroom",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "textile-building",   "roomKey": "mca-lab" },
+        "to":   { "deptKey": "electronics-building", "roomKey": "terrace" },
+        "hotspotText": "Terrace",
+        "direction": "branch-cross-dept"
+      },
+      {
+        "from": { "deptKey": "electronics-building", "roomKey": "it-staff-entrance" },
+        "to":   { "deptKey": "electronics-building", "roomKey": "it-staff-interior" },
+        "hotspotText": "IT Staff Interior",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "electronics-building", "roomKey": "it-staff-interior" },
+        "to":   { "deptKey": "electronics-building", "roomKey": "lab5-entrance" },
+        "hotspotText": "Lab 5 Entrance",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "electronics-building", "roomKey": "lab5-entrance" },
+        "to":   { "deptKey": "electronics-building", "roomKey": "lab5" },
+        "hotspotText": "Lab 5",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "admin-1" },
+        "to":   { "deptKey": "admin-building",     "roomKey": "admin-2" },
+        "hotspotText": "Admin Corridor",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "admin-2" },
+        "to":   { "deptKey": "admin-building",     "roomKey": "admin-3" },
+        "hotspotText": "Admin Interior",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "admin-3" },
+        "to":   { "deptKey": "admin-building",     "roomKey": "architechture" },
+        "hotspotText": "Architecture Junction",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "architechture" },
+        "to":   { "deptKey": "dome-and-cafeteria", "roomKey": "dome" },
+        "hotspotText": "Dome",
+        "direction": "branch-A-cross-dept"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "architechture" },
+        "to":   { "deptKey": "dome-and-cafeteria", "roomKey": "canteen" },
+        "hotspotText": "Canteen",
+        "direction": "branch-B-cross-dept"
+      },
+      {
+        "from": { "deptKey": "admin-building",     "roomKey": "architechture" },
+        "to":   { "deptKey": "co-building",        "roomKey": "civil-triangle" },
+        "hotspotText": "CO Building",
+        "direction": "branch-C-cross-dept"
+      },
+      {
+        "from": { "deptKey": "dome-and-cafeteria", "roomKey": "dome" },
+        "to":   { "deptKey": "dome-and-cafeteria", "roomKey": "amphitheatre" },
+        "hotspotText": "Amphitheatre",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "co-building",        "roomKey": "civil-triangle" },
+        "to":   { "deptKey": "co-building",        "roomKey": "xerox-corner" },
+        "hotspotText": "Xerox Corner",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "co-building",        "roomKey": "xerox-corner" },
+        "to":   { "deptKey": "co-building",        "roomKey": "library-entrance" },
+        "hotspotText": "Library",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "co-building",        "roomKey": "library-entrance" },
+        "to":   { "deptKey": "co-building",        "roomKey": "library-1" },
+        "hotspotText": "Library – Inside",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "co-building",        "roomKey": "library-1" },
+        "to":   { "deptKey": "co-building",        "roomKey": "library-2" },
+        "hotspotText": "Library Stacks",
+        "direction": "forward"
+      },
+      {
+        "from": { "deptKey": "co-building",        "roomKey": "library-2" },
+        "to":   { "deptKey": "co-building",        "roomKey": "reading-hall" },
+        "hotspotText": "Reading Hall",
+        "direction": "forward"
+      }
+    ]
+  }
+}

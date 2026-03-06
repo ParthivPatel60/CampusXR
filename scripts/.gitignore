@@ -1,0 +1,8 @@
+# Firebase service-account private key — NEVER commit this
+serviceAccount.json
+
+# Auto-generated Cloudinary URL cache — can be deleted to force re-upload
+room-url-cache.json
+
+# Node modules
+node_modules/
