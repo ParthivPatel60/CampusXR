@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../firebase';
 import {
   getDepartments,
   addDepartment,
@@ -8,9 +11,12 @@ import {
   getHotspots,
 } from '../../services/firestoreService';
 import { uploadImageToCloudinary } from '../../cloudinary';
+import HotspotEditor from '../../components/admin/HotspotEditor';
 
 export default function AdminPanel() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [hotspotEditorRoom, setHotspotEditorRoom] = useState(null); // { room, deptId }
   const [departments, setDepartments] = useState([]);
   const [roomsByDept, setRoomsByDept] = useState({});   // lazy cache: { deptId: Room[] }
   const [selectedRoomsDeptId, setSelectedRoomsDeptId] = useState(null);
@@ -113,6 +119,7 @@ export default function AdminPanel() {
   };
 
   return (
+    <>
     <div className="flex h-screen bg-gray-50 font-sans text-navy">
       {/* Sidebar */}
       <div className="w-64 bg-white shadow-xl flex flex-col">
@@ -141,7 +148,10 @@ export default function AdminPanel() {
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100">
-          <button className="w-full text-left px-4 py-2 font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+          <button
+            className="w-full text-left px-4 py-2 font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            onClick={() => signOut(auth).then(() => navigate('/admin/login'))}
+          >
             Log Out
           </button>
           <a href="/" className="block mt-4 text-center text-sm font-semibold text-blue-600 hover:underline">
@@ -357,8 +367,11 @@ export default function AdminPanel() {
                       ? <img src={room.imageURL} alt={room.name} className="object-cover w-full h-full" />
                       : <span className="text-gray-400 text-sm">No image uploaded</span>
                     }
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white font-semibold">
-                      Open Hotspot Editor (Pannellum)
+                    <div
+                      className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white font-semibold"
+                      onClick={() => setHotspotEditorRoom({ room, deptId: selectedRoomsDeptId })}
+                    >
+                      Open Hotspot Editor
                     </div>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900">{room.name}</h3>
@@ -380,5 +393,16 @@ export default function AdminPanel() {
         )}
       </div>
     </div>
+
+    {hotspotEditorRoom && (
+      <HotspotEditor
+        room={hotspotEditorRoom.room}
+        deptId={hotspotEditorRoom.deptId}
+        departments={departments}
+        allRoomsByDept={roomsByDept}
+        onClose={() => setHotspotEditorRoom(null)}
+      />
+    )}
+    </>
   );
 }
