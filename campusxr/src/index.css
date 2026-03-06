@@ -18,6 +18,17 @@
   --radius-glass-circle: 50px;
 }
 
+/* Utilities */
+@layer utilities {
+  .hidden-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .hidden-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ── Global reset ──────────────────────────────────────────────────────────── */
 *,
 *::before,
