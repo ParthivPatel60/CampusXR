@@ -1,121 +1,145 @@
 /**
  * SideControls.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Left-side floating vertical control panel — VisionOS-inspired refinement.
+ * Left-side floating vertical control panel — VisionOS-inspired glass.
  *
- * Glass CSS is UNCHANGED:
- *   Panel  : background linear-gradient indigo, blur(25px), boxShadow inset, 39px radius
- *   Buttons: rgba(255,255,255,0.10) bg, 2px rgba(255,255,255,0.30) border, 50px radius
- *
- * Improvements:
- *   • 44px touch-target buttons (accessibility minimum)
- *   • Coloured glow on hover per action type
- *   • Active press scale(0.92) feedback
- *   • Tooltip labels on hover (no DOM tooltip library needed)
- *   • Refined icon stroke weight (2px → 1.75px for cleaner look)
+ * Layout (top→bottom):
+ *   ┌──────────────└  D-pad: 3×3 cross grid
+ *   │  ↑  │         (up / left / reset-dot / right / down)
+ *   │← ● →│
+ *   │  ↓  │
+ *   └──────────────┘
+ *   ―――  divider
+ *   [+]  zoom in
+ *   [−]  zoom out
+ *   ―――  divider
+ *   [⛶]  fullscreen toggle
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import React, { useState } from 'react';
 
-/* ─── Glass tokens (UNCHANGED) ────────────────────────────────────────────── */
-const PANEL_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
+/* ─── Glass tokens (UNCHANGED) ──────────────────────────────────────────── */
+const PANEL_BG     = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
 const PANEL_SHADOW = 'inset -2px -2px 100px rgba(255,255,255,0.1), inset 2px 2px 100px rgba(66,66,66,0.1)';
-const BLUR = 'blur(25px)';
-const BTN_BG = 'rgba(255,255,255,0.10)';
-const BTN_BORDER = '2px solid rgba(255,255,255,0.30)';
+const BLUR         = 'blur(25px)';
+const BTN_BG       = 'rgba(255,255,255,0.10)';
+const BTN_BORDER   = '2px solid rgba(255,255,255,0.28)';
 
-/* ─── SVG Icons ────────────────────────────────────────────────────────────── */
-const Icons = {
-    Refresh: () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+/* ─── Tiny SVG icons ─────────────────────────────────────────────────────── */
+const IC = {
+    Up: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="18 15 12 9 6 15" />
         </svg>
     ),
-    ZoomIn: () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            <line x1="11" y1="8" x2="11" y2="14" />
-            <line x1="8" y1="11" x2="14" y2="11" />
+    Down: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
         </svg>
     ),
-    ZoomOut: () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            <line x1="8" y1="11" x2="14" y2="11" />
+    Left: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
         </svg>
     ),
-    Move: () => (
+    Right: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+        </svg>
+    ),
+    Dot: () => (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="12" r="6" />
+        </svg>
+    ),
+    Plus: () => (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3" />
-            <line x1="2" y1="12" x2="22" y2="12" />
-            <line x1="12" y1="2" x2="12" y2="22" />
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+    ),
+    Minus: () => (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+    ),
+    Fullscreen: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+        </svg>
+    ),
+    ExitFullscreen: () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="10" y1="14" x2="3" y2="21" />
+            <line x1="21" y1="3" x2="14" y2="10" />
         </svg>
     ),
 };
 
-/* ─── Single control button ─────────────────────────────────────────────────── */
-function CtrlBtn({ icon: Icon, label, onClick, glowColor = 'rgba(200,200,255,0.55)' }) {
-    const [hovered, setHovered] = useState(false);
-    const [pressed, setPressed] = useState(false);
-
+/* ─── Generic glass button ───────────────────────────────────────────────── */
+function GBtn({ icon: Icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
+                tooltipSide = 'right' }) {
+    const [hov, setHov] = useState(false);
+    const [prs, setPrs] = useState(false);
     return (
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', display: 'flex',
+                      justifyContent: 'center', alignItems: 'center' }}>
             <button
-                id={`side-ctrl-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                onMouseEnter={() => setHov(true)}
+                onMouseLeave={() => { setHov(false); setPrs(false); }}
+                onMouseDown={() => setPrs(true)}
+                onMouseUp={() => setPrs(false)}
                 onClick={onClick}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => { setHovered(false); setPressed(false); }}
-                onMouseDown={() => setPressed(true)}
-                onMouseUp={() => setPressed(false)}
                 title={label}
                 aria-label={label}
                 style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50px',
-                    border: hovered
-                        ? `2px solid rgba(255,255,255,0.70)`
-                        : BTN_BORDER,
-                    background: hovered ? 'rgba(255,255,255,0.16)' : BTN_BG,
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    borderRadius: '50%',
+                    border: hov ? '2px solid rgba(255,255,255,0.68)' : BTN_BORDER,
+                    background: hov ? 'rgba(255,255,255,0.16)' : BTN_BG,
                     backdropFilter: BLUR,
                     WebkitBackdropFilter: BLUR,
-                    boxShadow: hovered
-                        ? `${PANEL_SHADOW}, 0 0 20px ${glowColor}`
-                        : PANEL_SHADOW,
-                    /* Icon color */
-                    color: hovered ? '#ffffff' : 'rgba(255,255,255,0.78)',
-                    /* Feedback */
-                    transform: pressed ? 'scale(0.92)' : hovered ? 'scale(1.06)' : 'scale(1)',
-                    transition: 'all 0.15s ease',
+                    boxShadow: hov ? `${PANEL_SHADOW}, 0 0 18px ${glow}` : PANEL_SHADOW,
+                    color: hov ? '#fff' : 'rgba(255,255,255,0.75)',
+                    transform: prs ? 'scale(0.88)' : hov ? 'scale(1.08)' : 'scale(1)',
+                    transition: 'all 0.14s ease',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     outline: 'none',
+                    flexShrink: 0,
                 }}
             >
                 <Icon />
             </button>
-
-            {/* Floating tooltip */}
-            {hovered && (
+            {hov && (
                 <span style={{
                     position: 'absolute',
-                    left: 'calc(100% + 10px)',
+                    ...(tooltipSide === 'right'
+                        ? { left: 'calc(100% + 10px)' }
+                        : { right: 'calc(100% + 10px)' }),
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: 'rgba(0,0,0,0.72)',
+                    background: 'rgba(0,0,0,0.75)',
                     backdropFilter: 'blur(8px)',
                     WebkitBackdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.14)',
                     color: '#fff',
                     fontSize: '11px',
                     fontWeight: 500,
@@ -133,20 +157,38 @@ function CtrlBtn({ icon: Icon, label, onClick, glowColor = 'rgba(200,200,255,0.5
     );
 }
 
-/* ─── Divider line ─────────────────────────────────────────────────────────── */
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
 function Divider() {
     return (
         <div style={{
-            width: '24px',
-            height: '1px',
-            background: 'rgba(255,255,255,0.18)',
-            margin: '2px auto',
+            width: '28px', height: '1px',
+            background: 'rgba(255,255,255,0.16)',
+            margin: '1px auto',
+            flexShrink: 0,
         }} />
     );
 }
 
-/* ─── Main component ────────────────────────────────────────────────────────── */
-export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigate }) {
+/* ─── Main component ───────────────────────────────────────────────────────────── */
+export default function SideControls({
+    onPanUp, onPanDown, onPanLeft, onPanRight, onRefresh, onZoomIn, onZoomOut, onFullscreen,
+}) {
+    const [isFS, setIsFS] = useState(false);
+
+    const handleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.();
+            setIsFS(true);
+        } else {
+            document.exitFullscreen?.();
+            setIsFS(false);
+        }
+        onFullscreen?.();
+    };
+
+    // D-pad button size
+    const D = 36;
+
     return (
         <div
             id="side-controls-panel"
@@ -160,8 +202,7 @@ export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigat
                 flexDirection: 'column',
                 gap: '8px',
                 alignItems: 'center',
-                padding: '12px 10px',
-                /* Glass panel (UNCHANGED template) */
+                padding: '14px 10px',
                 background: PANEL_BG,
                 backdropFilter: BLUR,
                 WebkitBackdropFilter: BLUR,
@@ -170,12 +211,41 @@ export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigat
                 border: '1px solid rgba(255,255,255,0.18)',
             }}
         >
-            <CtrlBtn icon={Icons.Refresh} label="Refresh Scene" onClick={onRefresh} glowColor="rgba(168,162,255,0.6)" />
+            {/* ─────────── D-pad ─────────── */}
+            {/* Up */}
+            <GBtn icon={IC.Up}    label="Look Up"    onClick={onPanUp}    size={D}
+                  glow="rgba(168,162,255,0.55)" />
+            {/* Left / Reset-dot / Right */}
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                <GBtn icon={IC.Left}  label="Look Left"  onClick={onPanLeft}  size={D}
+                      glow="rgba(168,162,255,0.55)" />
+                <GBtn icon={IC.Dot}   label="Reset View"  onClick={onRefresh}  size={D}
+                      glow="rgba(168,162,255,0.55)" />
+                <GBtn icon={IC.Right} label="Look Right" onClick={onPanRight} size={D}
+                      glow="rgba(168,162,255,0.55)" />
+            </div>
+            {/* Down */}
+            <GBtn icon={IC.Down}  label="Look Down"   onClick={onPanDown}  size={D}
+                  glow="rgba(168,162,255,0.55)" />
+
             <Divider />
-            <CtrlBtn icon={Icons.ZoomIn} label="Zoom In" onClick={onZoomIn} glowColor="rgba(52,211,153,0.6)" />
-            <CtrlBtn icon={Icons.ZoomOut} label="Zoom Out" onClick={onZoomOut} glowColor="rgba(96,165,250,0.6)" />
+
+            {/* ────────── Zoom ────────── */}
+            <GBtn icon={IC.Plus}  label="Zoom In"   onClick={onZoomIn}  size={40}
+                  glow="rgba(52,211,153,0.55)" />
+            <GBtn icon={IC.Minus} label="Zoom Out"  onClick={onZoomOut} size={40}
+                  glow="rgba(96,165,250,0.55)" />
+
             <Divider />
-            <CtrlBtn icon={Icons.Move} label="Navigate / Pan" onClick={onNavigate} glowColor="rgba(251,191,36,0.6)" />
+
+            {/* ─────── Fullscreen ─────── */}
+            <GBtn
+                icon={isFS ? IC.ExitFullscreen : IC.Fullscreen}
+                label={isFS ? 'Exit Fullscreen' : 'Fullscreen'}
+                onClick={handleFullscreen}
+                size={40}
+                glow="rgba(251,191,36,0.55)"
+            />
         </div>
     );
 }

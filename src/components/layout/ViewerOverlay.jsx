@@ -30,7 +30,6 @@
 import React from 'react';
 import NavbarGlass from '../ui/NavbarGlass';
 import SideControls from '../ui/SideControls';
-import LocationLabel from '../ui/LocationLabel';
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function ViewerOverlay({
@@ -41,6 +40,10 @@ export default function ViewerOverlay({
     onZoomIn,
     onZoomOut,
     onRefresh,
+    onPanUp,
+    onPanDown,
+    onPanLeft,
+    onPanRight,
     is3DMode = false,
     onToggle3D,
     show3DToggle = false,
@@ -69,15 +72,10 @@ export default function ViewerOverlay({
                     onRefresh={onRefresh}
                     onZoomIn={onZoomIn}
                     onZoomOut={onZoomOut}
-                    onNavigate={() => { /* pan mode — Three.js mouse drag handles this natively */ }}
-                />
-            </div>
-
-            {/* ── 3. Bottom-left location label ── */}
-            <div className="pointer-events-none">
-                <LocationLabel
-                    location={activeRoom?.name || 'Terrace'}
-                    dept={activeDept}
+                    onPanUp={onPanUp}
+                    onPanDown={onPanDown}
+                    onPanLeft={onPanLeft}
+                    onPanRight={onPanRight}
                 />
             </div>
 

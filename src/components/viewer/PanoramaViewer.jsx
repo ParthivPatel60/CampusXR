@@ -510,6 +510,10 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                 camera.fov = 75;
                 camera.updateProjectionMatrix();
             },
+            panBy(dLon, dLat) {
+                targetLon += dLon;
+                targetLat = Math.max(-85, Math.min(85, targetLat + dLat));
+            },
         });
 
         // ── Cleanup ───────────────────────────────────────────────────────────────

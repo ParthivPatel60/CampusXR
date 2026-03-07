@@ -165,6 +165,7 @@ export default function NavbarGlass({
         {/* 3D Mode toggle — only shown when the active room has a splat3DUrl */}
         {show3DToggle && (
           <button
+            id="navbar-3d-toggle"
             onClick={onToggle3D}
             title="Next-gen neural rendering demo (Beta)"
             style={{

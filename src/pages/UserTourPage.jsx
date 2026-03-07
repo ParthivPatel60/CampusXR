@@ -90,6 +90,7 @@ export default function UserTourPage() {
   const [tourOpen, setTourOpen] = useState(false);
   const [isTourPlaying, setIsTourPlaying] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deptOpen, setDeptOpen] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(true);
   const [hotspots, setHotspots] = useState([]);
@@ -101,6 +102,7 @@ export default function UserTourPage() {
   const tourIntervalRef = useRef(null);
   const splat3DRef   = useRef(null);   // 3DGS iframe overlay
   const topLeftRef   = useRef(null);   // dept filter + search panel
+  const deptDropRef  = useRef(null);   // custom dept dropdown container
   const tourGuideRef = useRef(null);   // bottom-right tour guide panel
 
   /* ── Three.js camera handlers ────────────────────────────────────────────── */
@@ -108,7 +110,23 @@ export default function UserTourPage() {
   const handleZoomIn  = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.min(100, c.fov + 10); c.updateProjectionMatrix(); };
   const handleZoomOut = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.max(30,  c.fov - 10); c.updateProjectionMatrix(); };
   /* Reset: restores camera orientation AND field-of-view to defaults */
-  const handleRefresh = () => { viewerRef.current?.reset?.(); };
+  const handleRefresh   = () => { viewerRef.current?.reset?.(); };
+  /* Pan: nudge the look-at direction by a fixed step */
+  const PAN_STEP = 15; // degrees per button press
+  const handlePanUp    = () => { viewerRef.current?.panBy?.(0,  PAN_STEP); };
+  const handlePanDown  = () => { viewerRef.current?.panBy?.(0, -PAN_STEP); };
+  const handlePanLeft  = () => { viewerRef.current?.panBy?.(-PAN_STEP, 0); };
+  const handlePanRight = () => { viewerRef.current?.panBy?.( PAN_STEP, 0); };
+
+  /* ── Close dept dropdown on outside click ──────────────────────────────── */
+  useEffect(() => {
+    if (!deptOpen) return;
+    const handler = (e) => {
+      if (deptDropRef.current && !deptDropRef.current.contains(e.target)) setDeptOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [deptOpen]);
 
   /* ── GSAP animations ─────────────────────────────────────────────────────── */
   useGSAP(() => {
@@ -132,7 +150,7 @@ export default function UserTourPage() {
       // ─ Iframe overlay — fade in after a beat ─
       gsap.set(splat3DRef.current, { pointerEvents: 'auto' });
       gsap.fromTo(splat3DRef.current, { opacity: 0 }, { opacity: 1, duration: 0.55, delay: 0.12, ease: 'power2.inOut' });
-      // ─ Nav bar internals — slide up and out ─
+      // ─ Navbar: hide everything except logo + 3D toggle ─
       gsap.to('#navbar-nav-pills', { opacity: 0, y: -8,  duration: DUR, ease: 'power2.in', onComplete: () => gsap.set('#navbar-nav-pills', { pointerEvents: 'none' }) });
       gsap.to('#navbar-admin-btn', { opacity: 0, y: -8,  duration: DUR, delay: 0.05, ease: 'power2.in', onComplete: () => gsap.set('#navbar-admin-btn', { pointerEvents: 'none' }) });
       // ─ Side controls — slide left ─
@@ -323,6 +341,10 @@ export default function UserTourPage() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onRefresh={handleRefresh}
+        onPanUp={handlePanUp}
+        onPanDown={handlePanDown}
+        onPanLeft={handlePanLeft}
+        onPanRight={handlePanRight}
         is3DMode={is3DMode}
         onToggle3D={() => setIs3DMode(v => !v)}
         show3DToggle={true}
@@ -333,7 +355,7 @@ export default function UserTourPage() {
       <div ref={topLeftRef} style={{
         position: 'absolute',
         top: '72px',
-        left: '80px',       /* clear of SideControls (left: 20px + 44px btn + 16px gap) */
+        left: '20px',       /* aligned with SideControls left edge */
         zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
@@ -341,46 +363,81 @@ export default function UserTourPage() {
         width: '220px',
       }}>
 
-        {/* Department selector */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          ...PILL_STYLE,
-          borderRadius: '39px',
-          border: '1px solid rgba(255,255,255,0.22)',
-        }}>
-          <span style={{ color: 'rgba(255,255,255,0.50)', flexShrink: 0 }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </span>
-          <select
-            value={activeDept}
-            onChange={(e) => handleDeptChange(e.target.value)}
+        {/* Department selector — custom dropdown */}
+        <div ref={deptDropRef} style={{ position: 'relative' }}>
+          {/* Pill trigger */}
+          <div
+            onClick={() => setDeptOpen(o => !o)}
             style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: 500,
-              fontFamily: 'Montserrat, sans-serif',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              ...PILL_STYLE,
+              borderRadius: '39px',
+              border: deptOpen ? '1px solid rgba(255,255,255,0.50)' : '1px solid rgba(255,255,255,0.22)',
               cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none',
+              userSelect: 'none',
             }}
           >
-            <option value="All Departments" style={{ background: '#1e1b4b', color: '#fff' }}>All Departments</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.name} style={{ background: '#1e1b4b', color: '#fff' }}>{d.name}</option>
-            ))}
-          </select>
-          <span style={{ color: 'rgba(255,255,255,0.40)', flexShrink: 0 }}><ChevronDown /></span>
+            <span style={{ color: 'rgba(255,255,255,0.50)', flexShrink: 0, lineHeight: 0 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </span>
+            <span style={{ flex: 1, color: '#fff', fontSize: '13px', fontWeight: 500, fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {activeDept}
+            </span>
+            <span style={{
+              color: 'rgba(255,255,255,0.55)',
+              flexShrink: 0,
+              lineHeight: 0,
+              transform: deptOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}><ChevronDown /></span>
+          </div>
+
+          {/* Options panel */}
+          {deptOpen && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              right: 0,
+              background: 'rgba(14,10,44,0.92)',
+              backdropFilter: G_BLUR,
+              WebkitBackdropFilter: G_BLUR,
+              borderRadius: '20px',
+              border: '1px solid rgba(255,255,255,0.18)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+              zIndex: 50,
+              overflow: 'hidden',
+              maxHeight: '240px',
+              overflowY: 'auto',
+            }}>
+              {['All Departments', ...departments.map(d => d.name)].map(name => (
+                <div
+                  key={name}
+                  onClick={() => { handleDeptChange(name); setDeptOpen(false); }}
+                  style={{
+                    padding: '10px 16px',
+                    fontSize: '13px',
+                    fontFamily: 'Montserrat, sans-serif',
+                    color: activeDept === name ? '#fff' : 'rgba(255,255,255,0.70)',
+                    background: activeDept === name ? 'rgba(108,99,255,0.35)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (activeDept !== name) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseLeave={e => { if (activeDept !== name) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Room search */}
@@ -567,7 +624,7 @@ export default function UserTourPage() {
         </p>
       </div>
 
-      {/* ═══ BOTTOM NAV — breadcrumb + expandable room pills ═════════════ */}
+      {/* ═══ BOTTOM NAV — unified glass card: thumbnails + breadcrumb ══ */}
       <div
         ref={bottomNavRef}
         style={{
@@ -576,23 +633,33 @@ export default function UserTourPage() {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 40,
+        }}
+      >
+        <div style={{
+          background: G_BG,
+          backdropFilter: G_BLUR,
+          WebkitBackdropFilter: G_BLUR,
+          boxShadow: `${G_SHADOW}, 0 8px 32px rgba(0,0,0,0.30)`,
+          borderRadius: '24px',
+          border: '1px solid rgba(255,255,255,0.18)',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '8px',
-        }}
-      >
+          width: '100%',
+        }}>
         {/* Room thumbnail cards — horizontal scroll */}
         {showRoomList && (
+          <>
           <div
             className="pills-scroll"
             style={{
               display: 'flex',
-              gap: '8px',
+              gap: '6px',
               flexWrap: 'nowrap',
-              maxWidth: 'min(88vw, 820px)',
-              paddingBottom: '6px',
-              paddingTop: '2px',
+              width: '100%',
+              padding: '8px 8px 6px',
+              overflowX: 'auto',
             }}
           >
             {filteredRooms.map(room => {
@@ -616,9 +683,9 @@ export default function UserTourPage() {
                     }
                   }}
                   style={{
-                    width: '100px',
+                    width: '76px',
                     flexShrink: 0,
-                    borderRadius: '14px',
+                    borderRadius: '10px',
                     background: isActive
                       ? 'linear-gradient(160deg, rgba(108,99,255,0.38) 0%, rgba(255,255,255,0.06) 100%)'
                       : 'rgba(255,255,255,0.06)',
@@ -639,7 +706,7 @@ export default function UserTourPage() {
                   }}
                 >
                   {/* Thumbnail image */}
-                  <div style={{ width: '100%', height: '62px', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ width: '100%', height: '44px', overflow: 'hidden', position: 'relative' }}>
                     {room.imageURL ? (
                       <img
                         src={room.imageURL}
@@ -686,9 +753,9 @@ export default function UserTourPage() {
 
                   {/* Room name label */}
                   <div style={{
-                    padding: '5px 6px 6px',
+                    padding: '3px 5px 4px',
                     color: isActive ? '#ffffff' : 'rgba(255,255,255,0.68)',
-                    fontSize: '10px',
+                    fontSize: '9px',
                     fontWeight: 600,
                     fontFamily: 'Montserrat, sans-serif',
                     letterSpacing: '0.01em',
@@ -704,27 +771,23 @@ export default function UserTourPage() {
               );
             })}
           </div>
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.12)', margin: '0 8px' }} />
+          </>
         )}
 
         {/* Breadcrumb bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          padding: '10px 24px',
-          background: G_BG,
-          backdropFilter: G_BLUR,
-          WebkitBackdropFilter: G_BLUR,
-          boxShadow: `${G_SHADOW}, 0 8px 32px rgba(0,0,0,0.30)`,
-          borderRadius: '39px',
-          border: '1px solid rgba(255,255,255,0.20)',
+          gap: '8px',
+          padding: '7px 18px',
           whiteSpace: 'nowrap',
         }}>
           {/* Campus */}
-          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', fontWeight: 500 }}>
+          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 500 }}>
             Campus
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '16px', lineHeight: 1 }}>›</span>
+          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', lineHeight: 1 }}>›</span>
 
           {/* Department — clickable */}
           <button
@@ -734,7 +797,7 @@ export default function UserTourPage() {
               border: 'none',
               padding: 0,
               color: showRoomList ? 'rgba(168,162,255,1)' : 'rgba(255,255,255,0.65)',
-              fontSize: '13px',
+              fontSize: '11px',
               fontWeight: 600,
               fontFamily: 'Montserrat, sans-serif',
               cursor: 'pointer',
@@ -757,13 +820,13 @@ export default function UserTourPage() {
             </span>
           </button>
 
-          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '16px', lineHeight: 1 }}>›</span>
+          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', lineHeight: 1 }}>›</span>
 
           {/* Active room pill */}
           <span style={{
-            padding: '4px 14px',
+            padding: '3px 11px',
             color: '#ffffff',
-            fontSize: '13px',
+            fontSize: '11px',
             fontWeight: 700,
             fontFamily: 'Montserrat, sans-serif',
             letterSpacing: '-0.1px',
@@ -773,6 +836,7 @@ export default function UserTourPage() {
             {activeRoom?.name}
           </span>
         </div>
+        </div>{/* end unified glass wrapper */}
       </div>
 
       {/* ═══ BOTTOM-RIGHT: Merged Tour Guide Panel ══════════════════════ */}
