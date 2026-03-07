@@ -198,11 +198,15 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         const sphere = new THREE.Mesh(geometry, material);
         scene.add(sphere);
 
+        // ── Control state object attached to the viewer ───────────────────────────
+        const ctrl = {
+            lon: 0, lat: 0,
+            targetLon: 0, targetLat: 0
+        };
+
         // ── Drag-to-look controls ─────────────────────────────────────────────────
         let isPointerDown = false;
         let prevX = 0, prevY = 0;
-        let lon = 0, lat = 0;
-        let targetLon = 0, targetLat = 0;
 
         const onPointerDown = (e) => {
             isPointerDown = true;
@@ -213,9 +217,9 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             if (!isPointerDown) return;
             const x = e.clientX ?? e.touches?.[0]?.clientX;
             const y = e.clientY ?? e.touches?.[0]?.clientY;
-            targetLon -= (x - prevX) * 0.2;
-            targetLat += (y - prevY) * 0.2;
-            targetLat = Math.max(-85, Math.min(85, targetLat));
+            ctrl.targetLon -= (x - prevX) * 0.2;
+            ctrl.targetLat += (y - prevY) * 0.2;
+            ctrl.targetLat = Math.max(-85, Math.min(85, ctrl.targetLat));
             prevX = x; prevY = y;
         };
         const onPointerUp = () => { isPointerDown = false; };
@@ -254,11 +258,11 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             animId = requestAnimationFrame(animate);
 
             // Smooth damping
-            lon += (targetLon - lon) * 0.08;
-            lat += (targetLat - lat) * 0.08;
+            ctrl.lon += (ctrl.targetLon - ctrl.lon) * 0.08;
+            ctrl.lat += (ctrl.targetLat - ctrl.lat) * 0.08;
 
-            const phi = THREE.MathUtils.degToRad(90 - lat);
-            const theta = THREE.MathUtils.degToRad(lon);
+            const phi = THREE.MathUtils.degToRad(90 - ctrl.lat);
+            const theta = THREE.MathUtils.degToRad(ctrl.lon);
 
             camera.lookAt(
                 500 * Math.sin(phi) * Math.cos(theta),
@@ -268,8 +272,6 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             renderer.render(scene, camera);
 
             // ── Project hotspot world positions → screen pixels ───────────────────
-            // Pitch/yaw → 3D point on the panorama sphere using the same formula
-            // as the camera lookAt, so yaw=0/pitch=0 aligns with the default view.
             const container = markersContainerRef.current;
             if (container) {
                 const w = mount.clientWidth;
@@ -309,8 +311,8 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         };
         animate();
 
-        // Expose minimal API for zoom/reset controls in parent
-        if (onReady) onReady({ camera, renderer, scene });
+        // Expose minimal API for zoom/reset/pan controls in parent
+        if (onReady) onReady({ camera, renderer, scene, ctrl });
 
         // ── Cleanup ───────────────────────────────────────────────────────────────
         stateRef.current = { renderer, animId };

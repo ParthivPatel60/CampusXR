@@ -6,8 +6,9 @@ import fullLogo from '../../assets/fulllogo.png';
 
 export default function TopControls({ 
   searchQuery, setSearchQuery, filteredRooms, handleRoomSelect, activeRoom,
-  activeDept, departments, handleDeptChange, 
-  is3DMode, setIs3DMode
+  activeDept, departments = [], handleDeptChange, 
+  is3DMode, setIs3DMode,
+  onGuideClick, isGuideOpen,
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const toggleRef = useRef(null);
@@ -105,7 +106,7 @@ export default function TopControls({
             <button onClick={handleFullscreen} className="hidden md:block text-[14px] md:text-[15px] font-semibold text-white/80 hover:text-white transition-colors cursor-pointer bg-transparent border-none outline-none">Fullscreen</button>
           </GlassPanel>
           <GlassPanel className="flex items-center justify-center px-5 h-[30px] rounded-[50px] shadow-xl">
-            <button className="text-[14px] md:text-[15px] font-semibold text-white/80 hover:text-white transition-colors cursor-pointer bg-transparent border-none outline-none">Guide</button>
+            <button onClick={onGuideClick} className={`text-[14px] md:text-[15px] font-semibold transition-colors cursor-pointer bg-transparent border-none outline-none ${isGuideOpen ? 'text-[#A5B4FC]' : 'text-white/80 hover:text-white'}`}>Guide</button>
           </GlassPanel>
           <GlassPanel className="flex items-center justify-center px-5 h-[30px] rounded-[50px] shadow-xl">
             <button onClick={() => window.location.href = '/admin'} className="text-[14px] md:text-[15px] font-semibold text-white/80 hover:text-white transition-colors cursor-pointer bg-transparent border-none outline-none">Admin</button>

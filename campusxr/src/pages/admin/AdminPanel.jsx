@@ -9,6 +9,8 @@ import {
   getRooms,
   addRoom,
   getHotspots,
+  getTourSequence,
+  saveTourSequence,
 } from '../../services/firestoreService';
 import { uploadImageToCloudinary } from '../../cloudinary';
 import HotspotEditor from '../../components/admin/HotspotEditor';
@@ -33,6 +35,12 @@ export default function AdminPanel() {
   const [newRoomFile, setNewRoomFile] = useState(null);
   const [roomUploading, setRoomUploading] = useState(false);
   const [roomUploadError, setRoomUploadError] = useState('');
+
+  // Tour sequence state
+  const [tourItems, setTourItems] = useState([]);
+  const [tourSeqDeptFilter, setTourSeqDeptFilter] = useState('');
+  const [tourLoading, setTourLoading] = useState(false);
+  const [tourSaving, setTourSaving] = useState(false);
 
   // Derived totals for overview
   const totalRooms = Object.values(roomsByDept).reduce((sum, r) => sum + r.length, 0);
@@ -71,7 +79,18 @@ export default function AdminPanel() {
   useEffect(() => {
     loadRoomsForDept(selectedRoomsDeptId);
   }, [selectedRoomsDeptId, loadRoomsForDept]);
-
+  // ── Load tour sequence when Tour Sequence tab activates ────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'tourSequence') return;
+    setTourLoading(true);
+    getTourSequence().then(seq => {
+      setTourItems(seq);
+      setTourLoading(false);
+    });
+    // Pre-load rooms for all depts so the add panel works immediately
+    departments.forEach(d => loadRoomsForDept(d.id));
+    if (!tourSeqDeptFilter && departments.length > 0) setTourSeqDeptFilter(departments[0].id);
+  }, [activeTab, departments]);
   // ── Add / Delete handlers ─────────────────────────────────────────────────
   const handleAddDept = async () => {
     if (!newDeptName.trim()) return;
@@ -118,6 +137,35 @@ export default function AdminPanel() {
     }
   };
 
+  // ── Tour sequence handlers ──────────────────────────────────────────────────────
+  const addRoomToTour = (deptId, room) => {
+    setTourItems(prev => {
+      if (prev.some(i => i.roomId === room.id)) return prev;
+      const dept = departments.find(d => d.id === deptId);
+      return [...prev, { order: prev.length + 1, deptId, deptName: dept?.name || '', roomId: room.id, roomName: room.name, imageURL: room.imageURL || '' }];
+    });
+  };
+
+  const removeRoomFromTour = (roomId) => {
+    setTourItems(prev => prev.filter(i => i.roomId !== roomId).map((i, idx) => ({ ...i, order: idx + 1 })));
+  };
+
+  const moveTourItem = (index, direction) => {
+    setTourItems(prev => {
+      const next = [...prev];
+      const swapIdx = index + direction;
+      if (swapIdx < 0 || swapIdx >= next.length) return prev;
+      [next[index], next[swapIdx]] = [next[swapIdx], next[index]];
+      return next.map((i, idx) => ({ ...i, order: idx + 1 }));
+    });
+  };
+
+  const handleTourSave = async () => {
+    setTourSaving(true);
+    await saveTourSequence(tourItems);
+    setTourSaving(false);
+  };
+
   return (
     <>
     <div className="flex h-screen bg-gray-50 font-sans text-navy">
@@ -144,7 +192,13 @@ export default function AdminPanel() {
             className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'rooms' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('rooms')}
           >
-            Rooms & Hotspots
+            Rooms &amp; Hotspots
+          </button>
+          <button 
+            className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'tourSequence' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('tourSequence')}
+          >
+            Tour Sequence
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100">
@@ -391,6 +445,118 @@ export default function AdminPanel() {
             </div>
           </div>
         )}
+        {activeTab === 'tourSequence' && (
+          <div className="animate-fade-in">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900">Tour Sequence</h2>
+                <p className="text-gray-500 mt-1">Define the auto-tour playback order for the Guide feature.</p>
+              </div>
+              <button
+                onClick={handleTourSave}
+                disabled={tourSaving}
+                className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {tourSaving ? 'Saving…' : 'Save Sequence'}
+              </button>
+            </div>
+
+            {tourLoading ? (
+              <div className="text-gray-500 py-12 text-center">Loading tour data…</div>
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+                {/* Left: current sequence */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Current Sequence ({tourItems.length} rooms)</h3>
+                  {tourItems.length === 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+                      No rooms yet. Add rooms from the panel on the right.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {tourItems.map((item, idx) => (
+                        <div key={item.roomId} className="bg-white rounded-xl border border-gray-100 flex items-center gap-3 p-3">
+                          <span className="text-xs font-bold text-blue-600 w-6 text-center shrink-0">{idx + 1}</span>
+                          {item.imageURL && (
+                            <img src={item.imageURL} alt={item.roomName} className="w-16 h-10 object-cover rounded-lg shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{item.roomName}</p>
+                            <p className="text-xs text-gray-400 truncate">{item.deptName}</p>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => moveTourItem(idx, -1)}
+                              disabled={idx === 0}
+                              title="Move up"
+                              className="p-1.5 rounded text-gray-400 hover:text-blue-600 disabled:opacity-25 transition text-xs"
+                            >▲</button>
+                            <button
+                              onClick={() => moveTourItem(idx, 1)}
+                              disabled={idx === tourItems.length - 1}
+                              title="Move down"
+                              className="p-1.5 rounded text-gray-400 hover:text-blue-600 disabled:opacity-25 transition text-xs"
+                            >▼</button>
+                            <button
+                              onClick={() => removeRoomFromTour(item.roomId)}
+                              title="Remove"
+                              className="p-1.5 rounded text-gray-400 hover:text-red-500 transition text-xs ml-1"
+                            >✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: add rooms */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Add Rooms</h3>
+                    <select
+                      value={tourSeqDeptFilter}
+                      onChange={e => setTourSeqDeptFilter(e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400"
+                    >
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(roomsByDept[tourSeqDeptFilter] || []).map(room => {
+                      const alreadyAdded = tourItems.some(i => i.roomId === room.id);
+                      return (
+                        <button
+                          key={room.id}
+                          onClick={() => addRoomToTour(tourSeqDeptFilter, room)}
+                          disabled={alreadyAdded}
+                          className={`rounded-xl border text-left p-0 overflow-hidden transition ${alreadyAdded ? 'opacity-40 cursor-not-allowed border-gray-100' : 'border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer'}`}
+                        >
+                          <div className="aspect-video bg-gray-100 relative">
+                            {room.imageURL
+                              ? <img src={room.imageURL} alt={room.name} className="w-full h-full object-cover" />
+                              : <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No image</div>
+                            }
+                            {alreadyAdded && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <span className="text-white text-xs font-bold">Added</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{room.name}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
 

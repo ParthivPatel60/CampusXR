@@ -5,6 +5,8 @@ import {
   addDoc,
   deleteDoc,
   updateDoc,
+  setDoc,
+  getDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
@@ -104,4 +106,20 @@ export const deleteHotspot = async (deptId, roomId, hotspotId) => {
   await deleteDoc(
     doc(db, "departments", deptId, "rooms", roomId, "hotspots", hotspotId)
   );
+};
+
+// ---------------------------------------------------------------------------
+// Tour Sequence — single doc: tours/campus_tour
+// Item schema: { order, deptId, deptName, roomId, roomName, imageURL }
+// ---------------------------------------------------------------------------
+
+export const getTourSequence = async () => {
+  const snap = await getDoc(doc(db, "tours", "campus_tour"));
+  if (!snap.exists()) return [];
+  const items = snap.data().items || [];
+  return [...items].sort((a, b) => a.order - b.order);
+};
+
+export const saveTourSequence = async (items) => {
+  await setDoc(doc(db, "tours", "campus_tour"), { items });
 };

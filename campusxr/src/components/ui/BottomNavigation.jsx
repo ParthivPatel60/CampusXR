@@ -1,17 +1,19 @@
 import React, { useRef, useEffect } from 'react';
 import GlassPanel from './GlassPanel';
 
-export default function BottomNavigation({ activeRoom, rooms, handleRoomSelect, activeDept }) {
+export default function BottomNavigation({ activeRoom, activeRoomId, rooms, handleRoomSelect, onRoomSelect, activeDept }) {
   const scrollRef = useRef(null);
 
+  const resolvedActiveId = activeRoom?.id ?? activeRoomId;
+
   useEffect(() => {
-    if (activeRoom && scrollRef.current) {
-      const activeElement = scrollRef.current.querySelector(`[data-room-id="${activeRoom.id}"]`);
+    if (resolvedActiveId && scrollRef.current) {
+      const activeElement = scrollRef.current.querySelector(`[data-room-id="${resolvedActiveId}"]`);
       if (activeElement) {
         activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     }
-  }, [activeRoom]);
+  }, [resolvedActiveId]);
 
   if (!rooms || rooms.length === 0) return null;
 
@@ -27,18 +29,17 @@ export default function BottomNavigation({ activeRoom, rooms, handleRoomSelect, 
 
         <div
           ref={scrollRef}
-          className="flex items-center gap-[10px] overflow-x-auto scrollbar-hide snap-x p-[2px] w-full mask-edges pointer-events-auto"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="flex items-center gap-[10px] overflow-x-auto bottom-nav-scroll snap-x p-[2px] pb-1.5 w-full mask-edges pointer-events-auto"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.22) transparent' }}
         >
           {rooms.map((room) => {
-            const isActive = activeRoom?.id === room.id;
             return (
               <button
                 key={room.id}
                 data-room-id={room.id}
-                onClick={() => handleRoomSelect(room)}
+                onClick={() => onRoomSelect ? onRoomSelect(room.id) : handleRoomSelect?.(room)}
                 className={`snap-center shrink-0 group relative overflow-hidden rounded-xl transition-all duration-300 ${
-                  isActive ? 'ring-2 ring-[#A5B4FC] ring-offset-2 ring-offset-[#0B091A] scale-100 opacity-100' : 'scale-95 opacity-60 hover:opacity-100 hover:scale-100'
+                  resolvedActiveId === room.id ? 'ring-2 ring-[#A5B4FC] ring-offset-2 ring-offset-[#0B091A] scale-100 opacity-100' : 'scale-95 opacity-60 hover:opacity-100 hover:scale-100'
                 }`}
                 style={{ width: '110px', height: '75px' }}
               >
@@ -61,7 +62,10 @@ export default function BottomNavigation({ activeRoom, rooms, handleRoomSelect, 
         </div>
       </GlassPanel>
       <style dangerouslySetInnerHTML={{__html: `
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .bottom-nav-scroll::-webkit-scrollbar { height: 3px; }
+        .bottom-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+        .bottom-nav-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 9999px; }
+        .bottom-nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.40); }
         .mask-edges {
           -webkit-mask-image: linear-gradient(to right, transparent, black 1%, black 99%, transparent);
           mask-image: linear-gradient(to right, transparent, black 1%, black 99%, transparent);

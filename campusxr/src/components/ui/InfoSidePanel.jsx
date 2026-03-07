@@ -3,15 +3,17 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import GlassPanel from './GlassPanel';
 
-export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeHotspot }) {
+export default function InfoSidePanel({ showInfoPanel, isOpen, onClose, activeHotspot, activeRoom }) {
   const infoPanelRef = useRef(null);
+  const visible = showInfoPanel ?? isOpen;
+  const subject = activeHotspot ?? activeRoom;
 
   useGSAP(() => {
     let mm = gsap.matchMedia();
 
     mm.add("(max-width: 767px)", () => {
       // Mobile - Slide up
-      if (showInfoPanel) {
+      if (visible) {
         gsap.to(infoPanelRef.current, {
           x: 0,
           y: 0,
@@ -34,7 +36,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
 
     mm.add("(min-width: 768px)", () => {
       // Desktop - Slide in from right (more pronounced slide)
-      if (showInfoPanel) {
+      if (visible) {
         gsap.to(infoPanelRef.current, {
           x: 0,
           y: 0,
@@ -56,7 +58,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
     });
 
     return () => mm.revert();
-  }, [showInfoPanel]);
+  }, [visible]);
 
   const G_BG = 'linear-gradient(247.52deg, rgba(108, 99, 255, 0.17) 1.52%, rgba(255, 255, 255, 0) 96.99%)';
   const G_BLUR = 'blur(25px)';
@@ -103,7 +105,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
             Point of Interest
           </span>
           <button
-            onClick={() => setShowInfoPanel(false)}
+            onClick={onClose}
             style={{
               width: '32px',
               height: '32px',
@@ -129,10 +131,10 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
         </div>
 
         {/* Image */}
-        {activeHotspot?.image && (
+        {subject?.image || subject?.imageURL ? (
           <img
-            src={activeHotspot.image}
-            alt={activeHotspot.text}
+            src={subject?.image || subject?.imageURL}
+            alt={subject?.text || subject?.name}
             style={{
               borderRadius: '20px',
               objectFit: 'cover',
@@ -141,7 +143,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
               border: '1px solid rgba(255,255,255,0.15)',
             }}
           />
-        )}
+        ) : null}
 
         {/* Title */}
         <h2 style={{
@@ -153,7 +155,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
           fontFamily: 'Montserrat, sans-serif',
           lineHeight: 1.2,
         }}>
-          {activeHotspot?.text || 'Hotspot Detail'}
+          {subject?.text || subject?.name || 'Detail'}
         </h2>
 
         {/* Divider */}
@@ -169,7 +171,7 @@ export default function InfoSidePanel({ showInfoPanel, setShowInfoPanel, activeH
           overflowY: 'auto',
           flex: 1,
         }}>
-          {activeHotspot?.description ||
+          {subject?.description ||
             'Click on a coloured marker in the panorama to explore this location and see detailed information about the room, equipment, and facilities.'}
         </p>
       </div>
