@@ -145,14 +145,68 @@ function buildMarkerEl(hs, onClickCb) {
     return btn;
 }
 
+// Fixed pitch (degrees below horizon) at which floor arrows are projected.
+const FLOOR_ARROW_PITCH = -25;
+
+/** Build a standalone floor-level navigation arrow element. */
+function buildFloorArrowEl(hs, onClickCb) {
+    const el = document.createElement('button');
+    el.setAttribute('aria-label', `Go to ${hs.label || hs.text || 'next location'}`);
+    el.dataset.floorArrow = 'true';
+    el.dataset.hsId = hs.id;
+    Object.assign(el.style, {
+        position: 'absolute',
+        zIndex: '15',
+        cursor: 'pointer',
+        background: 'none',
+        border: 'none',
+        padding: '0',
+        outline: 'none',
+        display: 'none',
+        pointerEvents: 'auto',
+        transformOrigin: 'center center',
+        animation: 'arrowFade 2.5s ease-in-out infinite',
+    });
+    el.innerHTML = `<svg viewBox="0 0 44 44" width="88" height="88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="22,7 38,37 22,28 6,37" fill="#34D399" opacity="0.95"/>
+        <polygon points="22,7 38,37 22,28 6,37" fill="none" stroke="#10B981" stroke-width="2" stroke-linejoin="round"/>
+    </svg>`;
+
+    // GSV-style label — always kept horizontal by counter-rotating it each frame
+    const label = document.createElement('span');
+    label.dataset.arrowLabel = 'true';
+    label.textContent = hs.label || hs.text || 'Go';
+    Object.assign(label.style, {
+        position: 'absolute',
+        left: '50%',
+        top: 'calc(100% + 6px)',
+        transform: 'translateX(-50%)',
+        transformOrigin: 'top center',
+        whiteSpace: 'nowrap',
+        color: '#fff',
+        fontSize: '13px',
+        fontWeight: '600',
+        letterSpacing: '0.04em',
+        textShadow: '0 1px 6px rgba(0,0,0,0.85), 0 0 12px rgba(52,211,153,0.5)',
+        pointerEvents: 'none',
+        userSelect: 'none',
+    });
+    el.appendChild(label);
+
+    el.addEventListener('click', (e) => { e.stopPropagation(); onClickCb(hs); });
+    return el;
+}
+
 export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady }) {
     const mountRef = useRef(null);
     const markersContainerRef = useRef(null);
+    const arrowsContainerRef = useRef(null);
     const stateRef = useRef({});
 
     // Mutable refs let the animation loop always read the latest values
     // without re-initialising the entire Three.js scene.
     const hotspotsRef = useRef(hotspots);
+    const navHotspotsRef = useRef([]);
     const onClickRef = useRef(onHotspotClick);
 
     useEffect(() => { hotspotsRef.current = hotspots; }, [hotspots]);
@@ -166,6 +220,21 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         while (container.firstChild) container.removeChild(container.firstChild);
         hotspots.forEach((hs) => {
             const el = buildMarkerEl(hs, (clicked) => onClickRef.current?.(clicked));
+            container.appendChild(el);
+        });
+    }, [hotspots]);
+
+    // ── Rebuild floor arrow elements for navigation hotspots ──────────────────
+    useEffect(() => {
+        const container = arrowsContainerRef.current;
+        if (!container) return;
+
+        const navHotspots = hotspots.filter(hs => hs.type === 'navigation');
+        navHotspotsRef.current = navHotspots;
+
+        while (container.firstChild) container.removeChild(container.firstChild);
+        navHotspots.forEach((hs) => {
+            const el = buildFloorArrowEl(hs, (clicked) => onClickRef.current?.(clicked));
             container.appendChild(el);
         });
     }, [hotspots]);
@@ -305,6 +374,71 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                         el.style.display = 'none';
                     }
                 }
+
+                // ── Project floor arrows at fixed floor-level pitch ───────────────
+                const arrowContainer = arrowsContainerRef.current;
+                if (arrowContainer) {
+                    const navList = navHotspotsRef.current;
+                    const arrowEls = arrowContainer.children;
+                    const arrowPhi = THREE.MathUtils.degToRad(90 - FLOOR_ARROW_PITCH);
+
+                    for (let j = 0; j < arrowEls.length && j < navList.length; j++) {
+                        const hs = navList[j];
+                        const arrowEl = arrowEls[j];
+
+                        const arrowTheta = THREE.MathUtils.degToRad(hs.yaw ?? 0);
+                        _projVec.set(
+                            500 * Math.sin(arrowPhi) * Math.cos(arrowTheta),
+                            500 * Math.cos(arrowPhi),
+                            500 * Math.sin(arrowPhi) * Math.sin(arrowTheta),
+                        );
+                        _projVec.project(camera);
+
+                        const arrowVisible =
+                            _projVec.z <= 1 &&
+                            Math.abs(_projVec.x) <= 1.1 &&
+                            Math.abs(_projVec.y) <= 1.1;
+
+                        if (arrowVisible) {
+                            const ax = (_projVec.x + 1) / 2 * w;
+                            const ay = (1 - _projVec.y) / 2 * h;
+
+                            // Project the hotspot ring (at its actual pitch, same yaw) to get
+                            // the true on-screen target direction for the arrow tip.
+                            const ringPhi = THREE.MathUtils.degToRad(90 - (hs.pitch ?? 0));
+                            _projVec.set(
+                                500 * Math.sin(ringPhi) * Math.cos(arrowTheta),
+                                500 * Math.cos(ringPhi),
+                                500 * Math.sin(ringPhi) * Math.sin(arrowTheta),
+                            );
+                            _projVec.project(camera);
+
+                            // If ring is in front of camera use its screen pos directly;
+                            // if behind, negate NDC (antipodal) so the direction is still correct.
+                            const ringBehind = _projVec.z > 1;
+                            const tx = ringBehind
+                                ? (1 - _projVec.x) / 2 * w
+                                : (_projVec.x + 1) / 2 * w;
+                            const ty = ringBehind
+                                ? (1 + _projVec.y) / 2 * h
+                                : (1 - _projVec.y) / 2 * h;
+
+                            // atan2(dx, -dy) → clockwise angle from "up" for CSS rotation
+                            const angle = Math.atan2(tx - ax, -(ty - ay)) * (180 / Math.PI);
+                            arrowEl.style.left = `${ax}px`;
+                            arrowEl.style.top = `${ay}px`;
+                            arrowEl.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+                            arrowEl.style.display = '';
+                            // Counter-rotate the label so it stays horizontal regardless of arrow angle
+                            const labelEl = arrowEl.querySelector('[data-arrow-label]');
+                            if (labelEl) {
+                                labelEl.style.transform = `translateX(-50%) rotate(${-angle}deg)`;
+                            }
+                        } else {
+                            arrowEl.style.display = 'none';
+                        }
+                    }
+                }
             }
         };
         animate();
@@ -341,6 +475,11 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             <div
                 ref={markersContainerRef}
                 style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}
+            />
+            {/* Floor-level navigation arrows — projected at fixed pitch per hotspot yaw */}
+            <div
+                ref={arrowsContainerRef}
+                style={{ position: 'absolute', inset: 0, zIndex: 9, pointerEvents: 'none' }}
             />
         </div>
     );
