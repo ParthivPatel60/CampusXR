@@ -11,6 +11,8 @@
  *   hotspots       — array of Firestore hotspot docs { id, pitch, yaw, text, type, … }
  *   onHotspotClick — callback(hotspot) invoked when a marker is clicked
  *   onReady        — optional callback(viewer) called once the scene initialises
+ *   autoSpin       — boolean; manual spin (controls-bar button) at ~1.5 deg/s
+ *   tourSpin       — boolean; auto-tour-driven spin at ~2.4 deg/s (priority)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -145,7 +147,12 @@ function buildMarkerEl(hs, onClickCb) {
     return btn;
 }
 
-export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady }) {
+// ── Auto-spin speeds ─────────────────────────────────────────────────────────
+// Manual spin: ~1.5 deg/s  |  Tour spin: ~5.1 deg/s (fast, one 360° ≈ 70 s)
+const SPIN_DEG_PER_FRAME = 0.025;
+const TOUR_DEG_PER_FRAME = 0.085;
+
+export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady, autoSpin = false, tourSpin = false }) {
     const mountRef = useRef(null);
     const markersContainerRef = useRef(null);
     const stateRef = useRef({});
@@ -154,9 +161,16 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     // without re-initialising the entire Three.js scene.
     const hotspotsRef = useRef(hotspots);
     const onClickRef = useRef(onHotspotClick);
+    const autoSpinRef = useRef(autoSpin);
+    const tourSpinRef = useRef(tourSpin);
+    const isDraggingRef = useRef(false);
 
     useEffect(() => { hotspotsRef.current = hotspots; }, [hotspots]);
     useEffect(() => { onClickRef.current = onHotspotClick; }, [onHotspotClick]);
+
+    // Keep spin refs in sync without remounting Three.js
+    useEffect(() => { autoSpinRef.current = autoSpin; }, [autoSpin]);
+    useEffect(() => { tourSpinRef.current = tourSpin; }, [tourSpin]);
 
     // ── Rebuild marker DOM elements whenever the hotspot array changes ────────
     useEffect(() => {
@@ -206,6 +220,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
 
         const onPointerDown = (e) => {
             isPointerDown = true;
+            isDraggingRef.current = true;
             prevX = e.clientX ?? e.touches?.[0]?.clientX;
             prevY = e.clientY ?? e.touches?.[0]?.clientY;
         };
@@ -218,7 +233,10 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             targetLat = Math.max(-85, Math.min(85, targetLat));
             prevX = x; prevY = y;
         };
-        const onPointerUp = () => { isPointerDown = false; };
+        const onPointerUp = () => {
+            isPointerDown = false;
+            isDraggingRef.current = false;
+        };
 
         // Scroll / pinch zoom
         const onWheel = (e) => {
@@ -252,6 +270,15 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         let animId;
         const animate = () => {
             animId = requestAnimationFrame(animate);
+
+            // Auto-spin: tourSpin takes priority (faster), falls back to autoSpin
+            if (!isDraggingRef.current) {
+                if (tourSpinRef.current) {
+                    targetLon += TOUR_DEG_PER_FRAME;
+                } else if (autoSpinRef.current) {
+                    targetLon += SPIN_DEG_PER_FRAME;
+                }
+            }
 
             // Smooth damping
             lon += (targetLon - lon) * 0.08;
@@ -299,7 +326,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
 
                     if (visible) {
                         el.style.left = `${(_projVec.x + 1) / 2 * w}px`;
-                        el.style.top  = `${(1 - _projVec.y) / 2 * h}px`;
+                        el.style.top = `${(1 - _projVec.y) / 2 * h}px`;
                         el.style.display = '';
                     } else {
                         el.style.display = 'none';

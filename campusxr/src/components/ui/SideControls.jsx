@@ -13,6 +13,7 @@
  *   • Active press scale(0.92) feedback
  *   • Tooltip labels on hover (no DOM tooltip library needed)
  *   • Refined icon stroke weight (2px → 1.75px for cleaner look)
+ *   • Auto-spin toggle button with purple glow animation
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -57,6 +58,18 @@ const Icons = {
             <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3" />
             <line x1="2" y1="12" x2="22" y2="12" />
             <line x1="12" y1="2" x2="12" y2="22" />
+        </svg>
+    ),
+    Spin: ({ animating }) => (
+        <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+            style={animating ? { animation: 'sideSpinIcon 3s linear infinite' } : {}}
+        >
+            <path d="M21.5 2v6h-6" />
+            <path d="M2.5 12a10 10 0 0 1 17.8-6.3L21.5 8" />
+            <path d="M2.5 22v-6h6" />
+            <path d="M21.5 12a10 10 0 0 1-17.8 6.2L2.5 16" />
         </svg>
     ),
 };
@@ -146,7 +159,106 @@ function Divider() {
 }
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
-export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigate }) {
+/* ─── Spin button — active variant ─────────────────────────────────────────── */
+function SpinBtn({ autoSpin, onSpinToggle }) {
+    const [hovered, setHovered] = useState(false);
+    const [pressed, setPressed] = useState(false);
+
+    const isActive = autoSpin;
+
+    return (
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <button
+                id="side-ctrl-auto-spin"
+                onClick={onSpinToggle}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => { setHovered(false); setPressed(false); }}
+                onMouseDown={() => setPressed(true)}
+                onMouseUp={() => setPressed(false)}
+                title={isActive ? 'Stop auto-spin' : 'Start auto-spin'}
+                aria-label={isActive ? 'Stop auto-spin' : 'Start auto-spin'}
+                style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50px',
+                    border: isActive
+                        ? '2px solid rgba(168,85,247,0.90)'
+                        : hovered ? '2px solid rgba(255,255,255,0.70)' : BTN_BORDER,
+                    background: isActive
+                        ? 'rgba(139,92,246,0.30)'
+                        : hovered ? 'rgba(255,255,255,0.16)' : BTN_BG,
+                    backdropFilter: BLUR,
+                    WebkitBackdropFilter: BLUR,
+                    boxShadow: isActive
+                        ? `${PANEL_SHADOW}, 0 0 20px rgba(168,85,247,0.7)`
+                        : hovered ? `${PANEL_SHADOW}, 0 0 20px rgba(168,85,247,0.4)` : PANEL_SHADOW,
+                    animation: isActive ? 'sideSpinPulse 2s ease-in-out infinite' : 'none',
+                    color: isActive ? '#c4b5fd' : hovered ? '#ffffff' : 'rgba(255,255,255,0.78)',
+                    transform: pressed ? 'scale(0.92)' : hovered ? 'scale(1.06)' : 'scale(1)',
+                    transition: 'all 0.15s ease',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    outline: 'none',
+                }}
+            >
+                <Icons.Spin animating={isActive} />
+            </button>
+
+            {/* Tiny label */}
+            <span style={{
+                color: isActive ? 'rgba(196,181,253,0.9)' : 'rgba(255,255,255,0.42)',
+                fontSize: '9px',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                userSelect: 'none',
+                fontFamily: 'Montserrat, sans-serif',
+            }}>
+                {isActive ? 'ON' : 'SPIN'}
+            </span>
+
+            {/* Floating tooltip */}
+            {hovered && (
+                <span style={{
+                    position: 'absolute',
+                    left: 'calc(100% + 10px)',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(0,0,0,0.72)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    letterSpacing: '0.04em',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 100,
+                }}>
+                    {isActive ? 'Stop Auto-Spin' : 'Auto-Spin'}
+                </span>
+            )}
+
+            {/* Inline keyframes */}
+            <style>{`
+                @keyframes sideSpinPulse {
+                    0%,100% { box-shadow: ${PANEL_SHADOW}, 0 0 10px rgba(168,85,247,0.5); }
+                    50%      { box-shadow: ${PANEL_SHADOW}, 0 0 24px rgba(168,85,247,0.9); }
+                }
+                @keyframes sideSpinIcon {
+                    from { transform: rotate(0deg); }
+                    to   { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigate, autoSpin = false, onSpinToggle }) {
     return (
         <div
             id="side-controls-panel"
@@ -176,6 +288,8 @@ export default function SideControls({ onRefresh, onZoomIn, onZoomOut, onNavigat
             <CtrlBtn icon={Icons.ZoomOut} label="Zoom Out" onClick={onZoomOut} glowColor="rgba(96,165,250,0.6)" />
             <Divider />
             <CtrlBtn icon={Icons.Move} label="Navigate / Pan" onClick={onNavigate} glowColor="rgba(251,191,36,0.6)" />
+            <Divider />
+            <SpinBtn autoSpin={autoSpin} onSpinToggle={onSpinToggle} />
         </div>
     );
 }

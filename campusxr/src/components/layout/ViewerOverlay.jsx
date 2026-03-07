@@ -39,6 +39,8 @@ export default function ViewerOverlay({
     onZoomIn,
     onZoomOut,
     onRefresh,
+    autoSpin = false,
+    onSpinToggle,
 }) {
     return (
         /* Full-viewport overlay — pointer-events:none so panorama stays interactive.
@@ -60,6 +62,8 @@ export default function ViewerOverlay({
                     onZoomIn={onZoomIn}
                     onZoomOut={onZoomOut}
                     onNavigate={() => { /* pan mode — Three.js mouse drag handles this natively */ }}
+                    autoSpin={autoSpin}
+                    onSpinToggle={onSpinToggle}
                 />
             </div>
 

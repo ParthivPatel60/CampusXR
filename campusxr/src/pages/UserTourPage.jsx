@@ -27,6 +27,10 @@ import { useGSAP } from '@gsap/react';
 import ViewerOverlay from '../components/layout/ViewerOverlay';
 import PanoramaViewer from '../components/viewer/PanoramaViewer';
 import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
+import { useAutoTour } from '../hooks/useAutoTour';
+
+// Matches TOUR_DEG_PER_FRAME = 0.085 @ 60 fps → one full 360° + 1.5 s pause ≈ 72 100 ms
+const TOUR_DWELL_MS = Math.round((360 / (0.085 * 60)) * 1000) + 1500;
 
 gsap.registerPlugin(useGSAP);
 
@@ -90,6 +94,8 @@ export default function UserTourPage() {
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(false);
   const [hotspots, setHotspots] = useState([]);
+  const [autoSpin, setAutoSpin] = useState(false);
+  const [tourSpin, setTourSpin] = useState(false);
 
   /* ── Refs ────────────────────────────────────────────────────────────────── */
   const bottomNavRef = useRef(null);
@@ -143,6 +149,23 @@ export default function UserTourPage() {
     getHotspots(activeDeptId, activeRoom.id).then(setHotspots);
   }, [activeRoom, activeDeptId]);
 
+  /* ── Auto Tour ────────────────────────────────────────────────────────────── */
+  const { isTourRunning, startTour, stopTour } = useAutoTour({
+    departments,
+    getRoomsForDept: async (deptId) => getRooms(deptId),
+    onNavigate: (dept, room) => {
+      setActiveDept(dept.name);
+      setActiveDeptId(dept.id);
+      setActiveRoom(room);
+    },
+    tourDwellMs: TOUR_DWELL_MS,
+  });
+
+  // tourSpin mirrors isTourRunning — panorama rotates during each room stop
+  useEffect(() => {
+    setTourSpin(isTourRunning);
+  }, [isTourRunning]);
+
   /* ── Handlers ────────────────────────────────────────────────────────────── */
   const handleHotspotClick = (hs) => {
     if (hs.type === 'info') { setActiveHotspot(hs); setShowInfoPanel(true); }
@@ -162,7 +185,11 @@ export default function UserTourPage() {
     const dept = departments.find(d => d.name === deptName);
     if (dept) setActiveDeptId(dept.id);
   };
-  const handleRoomSelect = (room) => { setActiveRoom(room); setShowRoomList(false); };
+  const handleRoomSelect = (room) => {
+    if (isTourRunning) stopTour();
+    setActiveRoom(room);
+    setShowRoomList(false);
+  };
 
   const filteredRooms = rooms.filter(r =>
     r.name.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -186,6 +213,8 @@ export default function UserTourPage() {
             hotspots={hotspots}
             onHotspotClick={handleHotspotClick}
             onReady={(viewer) => { viewerRef.current = viewer; }}
+            autoSpin={autoSpin}
+            tourSpin={tourSpin}
           />
         )}
         {!is3DMode && !activeRoom?.imageURL && (
@@ -213,6 +242,8 @@ export default function UserTourPage() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onRefresh={handleRefresh}
+        autoSpin={autoSpin}
+        onSpinToggle={() => setAutoSpin(v => !v)}
       />
 
       {/* ═══ TOP-LEFT: Dept filter + search ═══════════════════════════════ */}
@@ -401,34 +432,74 @@ export default function UserTourPage() {
 
         {/* Auto Guided Tour */}
         <button
+          onClick={isTourRunning ? stopTour : startTour}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '7px',
             padding: '8px 18px',
             borderRadius: '39px',
-            background: G_BG,
+            background: isTourRunning
+              ? 'linear-gradient(135deg,rgba(139,92,246,0.75),rgba(109,40,217,0.75))'
+              : G_BG,
             backdropFilter: G_BLUR,
             WebkitBackdropFilter: G_BLUR,
-            boxShadow: G_SHADOW,
-            border: '1px solid rgba(255,255,255,0.20)',
-            color: 'rgba(255,255,255,0.80)',
+            boxShadow: isTourRunning
+              ? `${G_SHADOW}, 0 0 18px rgba(139,92,246,0.65)`
+              : G_SHADOW,
+            border: isTourRunning
+              ? '2px solid rgba(168,85,247,0.75)'
+              : '1px solid rgba(255,255,255,0.20)',
+            color: '#fff',
             fontSize: '13px',
             fontWeight: 600,
             fontFamily: 'Montserrat, sans-serif',
             cursor: 'pointer',
             outline: 'none',
-            transition: 'all 0.18s ease',
+            transition: 'all 0.3s ease',
+            letterSpacing: '0.04em',
+            position: 'relative',
+            overflow: 'hidden',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.80)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.20)'; e.currentTarget.style.background = G_BG; }}
         >
-          {/* Play icon */}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
-          Auto Tour
+          {/* Shimmer sweep while tour is running */}
+          {isTourRunning && (
+            <span style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.15) 50%,transparent 100%)',
+              animation: 'tourSweep 2s linear infinite',
+              pointerEvents: 'none',
+            }} />
+          )}
+          {isTourRunning ? (
+            <>
+              {/* Spinning loader icon */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                style={{ animation: 'tourIconSpin 1.2s linear infinite', flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="9" strokeDasharray="28 56" strokeLinecap="round" />
+              </svg>
+              Stop Tour
+            </>
+          ) : (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ flexShrink: 0 }}>
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Auto Tour
+            </>
+          )}
         </button>
+        <style>{`
+          @keyframes tourSweep {
+            from { transform: translateX(-100%); }
+            to   { transform: translateX(200%); }
+          }
+          @keyframes tourIconSpin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
 
       {/* ═══ INFO SIDE PANEL ══════════════════════════════════════════════ */}
