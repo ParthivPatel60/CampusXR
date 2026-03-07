@@ -16,6 +16,7 @@
  */
 
 import React, { useState } from 'react';
+import logoSrc from '../../assets/logo.png';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────────── */
 const GLASS_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
@@ -140,9 +141,16 @@ export default function NavbarGlass({
         style={{ display: 'flex', alignItems: 'center' }}
       >
         <img
-          src="/logo.png"
+          src={logoSrc}
           alt="CampusXR"
-          style={{ height: '48px', width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.35))' }}
+          draggable={false}
+          style={{
+            height: '54px',
+            width: 'auto',
+            objectFit: 'contain',
+            userSelect: 'none',
+            filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.40))',
+          }}
         />
       </div>
 

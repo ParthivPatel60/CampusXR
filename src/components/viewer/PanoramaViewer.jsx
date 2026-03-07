@@ -145,9 +145,127 @@ function buildMarkerEl(hs, onClickCb) {
     return btn;
 }
 
+// ── Street-View-style flat floor arrow for navigation hotspots ───────────────
+/**
+ * Builds a flat triangular arrow that is independently projected into screen
+ * space (same technique as hotspot markers) so multiple arrows spread out
+ * across the viewport rather than clustering at one anchor point.
+ * The arrow SVG is a wide flat chevron matching the Google Street View aesthetic.
+ * The wrapper is positioned by the animate loop via `left` / `top` and
+ * screen-space rotation via `transform: translate(-50%,-50%) rotate(Xdeg)`.
+ */
+function buildArrowEl(hs, onClickCb) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const fId = `nav-arrow-${String(hs.id || Math.random()).replace(/\W/g, '_')}`;
+
+    // Outer wrapper — positioned absolutely by the animate loop
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, {
+        position: 'absolute',
+        display: 'none',           // shown by animate() once in-frame
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        // transform is set per-frame; origin is center of the element
+        transform: 'translate(-50%, -50%) rotate(0deg)',
+        transformOrigin: 'center center',
+        zIndex: '30',
+        pointerEvents: 'none',     // clicks are on the inner button
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        opacity: '0',
+        transition: 'opacity 0.3s ease',
+    });
+
+    // Clickable button (covers the whole element)
+    const btn = document.createElement('button');
+    Object.assign(btn.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        background: 'none',
+        border: 'none',
+        padding: '0',
+        cursor: 'pointer',
+        outline: 'none',
+        pointerEvents: 'auto',
+    });
+
+    // ── Arrow SVG — wide flat chevron (matches screenshot proportions) ────────
+    // viewBox 90×48: wide & short = flat on-floor look.
+    // Shape: a flat play-button triangle pointing upward (tip at top-center).
+    // visually looks like a flat floor arrow when viewed in panorama.
+    const arrowD = 'M45,4 L86,44 L45,30 L4,44 Z';
+
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '80');
+    svg.setAttribute('height', '44');
+    svg.setAttribute('viewBox', '0 0 90 48');
+    svg.style.display = 'block';
+    svg.style.filter = 'drop-shadow(0 0 8px rgba(52,211,153,0.70))';
+    svg.style.transition = 'transform 0.15s ease';
+
+    // Glow / fill layers
+    const glowPth = document.createElementNS(ns, 'path');
+    glowPth.setAttribute('d', arrowD);
+    glowPth.setAttribute('fill', 'rgba(52,211,153,0.35)');
+    svg.appendChild(glowPth);
+
+    const mainPth = document.createElementNS(ns, 'path');
+    mainPth.setAttribute('d', arrowD);
+    mainPth.setAttribute('fill', 'rgba(52,211,153,0.82)');
+    mainPth.setAttribute('stroke', 'rgba(255,255,255,0.70)');
+    mainPth.setAttribute('stroke-width', '2');
+    mainPth.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(mainPth);
+
+    btn.appendChild(svg);
+
+    // ── Label pill ───────────────────────────────────────────────────────────
+    const label = document.createElement('div');
+    label.textContent = hs.text || 'Navigate';
+    Object.assign(label.style, {
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: '700',
+        letterSpacing: '0.07em',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: 'rgba(8,8,24,0.78)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        padding: '5px 14px',
+        borderRadius: '20px',
+        border: '1.5px solid rgba(52,211,153,0.75)',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.55)',
+        whiteSpace: 'nowrap',
+        textShadow: '0 1px 4px rgba(0,0,0,0.90)',
+        pointerEvents: 'none',
+    });
+    btn.appendChild(label);
+
+    wrapper.appendChild(btn);
+
+    // Hover feedback
+    btn.addEventListener('mouseenter', () => {
+        mainPth.setAttribute('fill', 'rgba(255,255,255,0.92)');
+        svg.style.filter = 'drop-shadow(0 0 14px rgba(52,211,153,0.95))';
+        label.style.background = 'rgba(16,185,129,0.88)';
+    });
+    btn.addEventListener('mouseleave', () => {
+        mainPth.setAttribute('fill', 'rgba(52,211,153,0.82)');
+        svg.style.filter = 'drop-shadow(0 0 8px rgba(52,211,153,0.70))';
+        label.style.background = 'rgba(8,8,24,0.78)';
+    });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); onClickCb(hs); });
+
+    return wrapper;
+}
+
 export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady }) {
     const mountRef = useRef(null);
     const markersContainerRef = useRef(null);
+    const arrowsAnchorRef = useRef(null);
     const stateRef = useRef({});
 
     // Mutable refs let the animation loop always read the latest values
@@ -168,6 +286,19 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             const el = buildMarkerEl(hs, (clicked) => onClickRef.current?.(clicked));
             container.appendChild(el);
         });
+    }, [hotspots]);
+
+    // ── Rebuild Street-View nav arrows whenever hotspots change ──────────────
+    useEffect(() => {
+        const anchor = arrowsAnchorRef.current;
+        if (!anchor) return;
+        while (anchor.firstChild) anchor.removeChild(anchor.firstChild);
+        hotspots
+            .filter(h => h.type === 'navigation')
+            .forEach(hs => {
+                const el = buildArrowEl(hs, clicked => onClickRef.current?.(clicked));
+                anchor.appendChild(el);
+            });
     }, [hotspots]);
 
     // ── Three.js scene — only re-initialises when imageURL changes ────────────
@@ -306,6 +437,65 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     }
                 }
             }
+
+            // ── Street-View arrows: project each independently like hotspot markers ──
+            const arrowAnchor = arrowsAnchorRef.current;
+            if (arrowAnchor) {
+                const navList = hotspotsRef.current.filter(h => h.type === 'navigation');
+                const arrowEls = arrowAnchor.children;
+                const w2 = mount.clientWidth;
+                const h2 = mount.clientHeight;
+
+                for (let j = 0; j < arrowEls.length && j < navList.length; j++) {
+                    const hs = navList[j];
+                    const el = arrowEls[j];
+
+                    // Project the hotspot's 3D position to screen (same as marker logic)
+                    const hsPhi   = THREE.MathUtils.degToRad(90 - (hs.pitch ?? 0));
+                    const hsTheta = THREE.MathUtils.degToRad(hs.yaw ?? 0);
+                    _projVec.set(
+                        500 * Math.sin(hsPhi) * Math.cos(hsTheta),
+                        500 * Math.cos(hsPhi),
+                        500 * Math.sin(hsPhi) * Math.sin(hsTheta),
+                    );
+                    _projVec.project(camera);
+
+                    const inFront = _projVec.z <= 1;
+                    const sx = (_projVec.x + 1) / 2 * w2;
+                    const sy = (1 - _projVec.y) / 2 * h2;
+
+                    // Show only when hotspot is in the front hemisphere
+                    // but clamp the arrow to the lower third of the viewport
+                    // so it always appears near floor level.
+                    if (!inFront) {
+                        el.style.display = 'none';
+                        continue;
+                    }
+
+                    // Arrow screen-X tracks the hotspot; Y is clamped to lower 30% of screen
+                    const clampedY = Math.max(h2 * 0.62, Math.min(h2 * 0.88, sy));
+
+                    // Screen-space rotation: angle from clamped arrow pos → actual hotspot pos
+                    const dx = sx - parseFloat(el.style.left || w2 / 2);
+                    const dy = sy - clampedY;
+                    // Compute angle so the arrow tip (top of SVG) points toward the hotspot
+                    const screenAngle = Math.atan2(dx, -dy) * (180 / Math.PI);
+
+                    el.style.left    = `${sx.toFixed(1)}px`;
+                    el.style.top     = `${clampedY.toFixed(1)}px`;
+                    el.style.display = 'flex';
+                    el.style.transform = `translate(-50%, -50%) rotate(${screenAngle.toFixed(1)}deg)`;
+
+                    // Fade based on how far the hotspot is from screen center
+                    const normX = Math.abs(_projVec.x);
+                    const normY = Math.abs(_projVec.y);
+                    const edgeFactor = Math.max(normX, normY);
+                    const opacity = edgeFactor > 0.92 ? 0 : edgeFactor > 0.70
+                        ? 1 - ((edgeFactor - 0.70) / 0.22)
+                        : 1;
+                    el.style.opacity = opacity.toFixed(3);
+                }
+            }
         };
         animate();
 
@@ -351,6 +541,17 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             <div
                 ref={markersContainerRef}
                 style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}
+            />
+            {/* Street-View arrows — full-overlay container; each arrow is independently positioned */}
+            <div
+                ref={arrowsAnchorRef}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 30,
+                    pointerEvents: 'none',
+                    overflow: 'hidden',
+                }}
             />
         </div>
     );
