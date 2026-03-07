@@ -68,15 +68,9 @@ function UserTourPage() {
                 const sortedDepts = [deptsData[0], ...deptsData.slice(1).sort((a,b) => a.name.localeCompare(b.name))];
                 setDepartments(sortedDepts);
 
-                // 2. Fetch ALL rooms from each department's subcollection
-                const realDepts = deptsData.filter(d => d.id !== 'all');
-                const roomsByDept = await Promise.all(
-                    realDepts.map(async d => {
-                        const snap = await getDocs(collection(db, 'departments', d.id, 'rooms'));
-                        return snap.docs.map(doc => ({ id: doc.id, departmentId: d.id, ...doc.data() }));
-                    })
-                );
-                const allRooms = roomsByDept.flat();
+                // 2. Fetch ALL rooms to build the complete graph (and the 'All' department view)
+                const roomsSnap = await getDocs(collection(db, 'rooms'));
+                const allRooms = roomsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setRooms(allRooms);
                 
                 // Only set active room to first if we aren't loading a tour
@@ -89,17 +83,8 @@ function UserTourPage() {
                 if (savedSequence && savedSequence.length > 0) {
                     setTourSequence(savedSequence);
                     
-                    // Rebuild the ordered room objects from the sequence items
-                    const orderedRooms = savedSequence
-                        .map(item => {
-                            // Items from our firestoreService have { roomId, deptId, roomName, imageURL }
-                            const found = allRooms.find(r => r.id === (item.roomId || item));
-                            if (found) return found;
-                            // Fallback: reconstruct from denormalized item
-                            if (item.roomId) return { id: item.roomId, name: item.roomName, imageURL: item.imageURL, departmentId: item.deptId };
-                            return null;
-                        })
-                        .filter(Boolean);
+                    // Rebuild the ordered room objects from the ID sequence
+                    const orderedRooms = savedSequence.map(id => allRooms.find(r => r.id === id)).filter(Boolean);
                     setTourRooms(orderedRooms);
                     
                     if (activeDeptId === 'all' && orderedRooms.length > 0) {
@@ -142,9 +127,9 @@ function UserTourPage() {
         if (idx < filteredRooms.length - 1) toLoad.push(filteredRooms[idx + 1]);
 
         toLoad.forEach(room => {
-            if (room.imageURL && !panoCache[room.id]) {
+            if (room.panoramaUrl && !panoCache[room.id]) {
                 const img = new Image();
-                img.src = room.imageURL;
+                img.src = room.panoramaUrl;
                 setPanoCache(prev => ({ ...prev, [room.id]: true }));
             }
         });
@@ -325,10 +310,10 @@ function UserTourPage() {
 
             {/* Main Interactive Viewer Context */}
             <div className="absolute inset-0 z-0 bg-neutral-900" onPointerDown={handlePointerDown}>
-                {activeRoom?.imageURL ? (
+                {activeRoom?.panoramaUrl ? (
                     <PanoramaViewer 
                         key={activeRoom.id}
-                        imageURL={activeRoom.imageURL}
+                        imageURL={activeRoom.panoramaUrl}
                         hotspots={activeRoom.hotspots || []}
                         onHotspotClick={handleHotspotClick}
                         onReady={(ctx) => viewerContextRef.current = ctx}
