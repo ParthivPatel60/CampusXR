@@ -21,8 +21,10 @@
  *  onNavClick  {fn}      — called with nav label
  *  onZoomIn    {fn}      — zoom in (Three.js camera FOV ↓)
  *  onZoomOut   {fn}      — zoom out (Three.js camera FOV ↑)
- *  onRefresh   {fn}      — reset camera to default view
- * ─────────────────────────────────────────────────────────────────────────────
+ *  onRefresh   {fn}      — reset camera to default view *  is3DMode    {bool}    — whether 3DGS mode is active
+ *  onToggle3D  {fn}      — toggle 3DGS mode
+ *  show3DToggle {bool}   — whether to show the 3D mode button
+ *  onAdminClick {fn}     — navigate to admin login * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import React from 'react';
@@ -34,11 +36,15 @@ import LocationLabel from '../ui/LocationLabel';
 export default function ViewerOverlay({
     activeRoom = { name: 'Terrace' },
     activeDept = '',
-    activeNav = 'ADMIN',
+    activeNav = '',
     onNavClick,
     onZoomIn,
     onZoomOut,
     onRefresh,
+    is3DMode = false,
+    onToggle3D,
+    show3DToggle = false,
+    onAdminClick,
 }) {
     return (
         /* Full-viewport overlay — pointer-events:none so panorama stays interactive.
@@ -50,6 +56,10 @@ export default function ViewerOverlay({
                 <NavbarGlass
                     activeNav={activeNav}
                     onNavClick={onNavClick}
+                    is3DMode={is3DMode}
+                    onToggle3D={onToggle3D}
+                    show3DToggle={show3DToggle}
+                    onAdminClick={onAdminClick}
                 />
             </div>
 

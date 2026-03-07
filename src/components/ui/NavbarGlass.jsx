@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 
 /* ─── Design tokens ─────────────────────────────────────────────────────────── */
 const GLASS_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
@@ -54,16 +54,19 @@ const Icons = {
       <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
     </svg>
   ),
-  Maximize: () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+  Lock: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   ),
-  Minimize: () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+  Cube: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   ),
 };
@@ -115,25 +118,14 @@ function NavPill({ label, icon: Icon, active = false, onClick }) {
 }
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
-export default function NavbarGlass({ activeNav = 'ADMIN', onNavClick }) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const handleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => { });
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => { });
-      setIsFullscreen(false);
-    }
-    onNavClick?.('FULLSCREEN');
-  }, [onNavClick]);
-
-  const navItems = [
-    { label: 'ADMIN', icon: Icons.Admin },
-    { label: 'ABOUT', icon: Icons.Info },
-    { label: 'SHARE', icon: Icons.Share },
-  ];
+export default function NavbarGlass({
+  activeNav = '',
+  onNavClick,
+  is3DMode = false,
+  onToggle3D,
+  show3DToggle = false,
+  onAdminClick,
+}) {
 
   return (
     <div
@@ -142,95 +134,118 @@ export default function NavbarGlass({ activeNav = 'ADMIN', onNavClick }) {
     >
 
       {/* ── Logo ─────────────────────────────────────────────────────────────── */}
-      <div className="pointer-events-auto" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-
-        {/* Badge circle */}
-        <div
-          id="navbar-logo-badge"
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(108,99,255,0.30)',
-            border: '2px solid rgba(255,255,255,0.55)',
-            backdropFilter: GLASS_BLUR,
-            WebkitBackdropFilter: GLASS_BLUR,
-            boxShadow: `${GLASS_SHADOW}, 0 4px 20px rgba(108,99,255,0.50)`,
-          }}
-        >
-          {/* Mini logo mark — two overlapping circles */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="9" cy="12" r="6" fill="rgba(255,255,255,0.90)" />
-            <circle cx="15" cy="12" r="6" fill="rgba(108,99,255,0.75)" />
-          </svg>
-        </div>
-
-        {/* Wordmark */}
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-          <span style={{
-            color: '#ffffff',
-            fontSize: '17px',
-            fontWeight: 700,
-            letterSpacing: '-0.4px',
-            fontFamily: 'Montserrat, sans-serif',
-          }}>
-            Campus<span style={{ color: 'rgba(168,162,255,1)' }}>XR</span>
-          </span>
-          <span style={{
-            color: 'rgba(255,255,255,0.45)',
-            fontSize: '10px',
-            fontWeight: 500,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            marginTop: '1px',
-          }}>
-            Virtual Tour
-          </span>
-        </div>
+      <div
+        id="navbar-logo-badge"
+        className="pointer-events-auto"
+        style={{ display: 'flex', alignItems: 'center' }}
+      >
+        <img
+          src="/logo.png"
+          alt="CampusXR"
+          style={{ height: '48px', width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.35))' }}
+        />
       </div>
 
-      {/* ── Nav pills ────────────────────────────────────────────────────────── */}
-      <nav
-        id="navbar-nav-pills"
+      {/* ── Center spacer (nav pills removed) ─────────────────────────────── */}
+      <div id="navbar-nav-pills" />
+
+      {/* ── Right side — Admin Login + 3DGS toggle ─────────────────────────── */}
+      <div
         className="pointer-events-auto"
-        aria-label="Primary navigation"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '8px 12px',
-          borderRadius: '39px',
-          background: GLASS_BG,
-          backdropFilter: GLASS_BLUR,
-          WebkitBackdropFilter: GLASS_BLUR,
-          boxShadow: GLASS_SHADOW,
-          border: '1px solid rgba(255,255,255,0.18)',
-        }}
+        style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
       >
-        {navItems.map(({ label, icon }) => (
-          <NavPill
-            key={label}
-            label={label}
-            icon={icon}
-            active={activeNav === label}
-            onClick={() => onNavClick?.(label)}
-          />
-        ))}
+        {/* 3D Mode toggle — only shown when the active room has a splat3DUrl */}
+        {show3DToggle && (
+          <button
+            onClick={onToggle3D}
+            title="Next-gen neural rendering demo (Beta)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              padding: '8px 16px',
+              borderRadius: '50px',
+              background: is3DMode ? 'rgba(245,158,11,0.22)' : PILL_IDLE_BG,
+              backdropFilter: GLASS_BLUR,
+              WebkitBackdropFilter: GLASS_BLUR,
+              boxShadow: is3DMode
+                ? `${GLASS_SHADOW}, 0 0 16px rgba(251,191,36,0.30)`
+                : GLASS_SHADOW,
+              border: is3DMode ? '2px solid rgba(251,191,36,0.80)' : PILL_IDLE_BORDER,
+              color: is3DMode ? '#fde68a' : 'rgba(255,255,255,0.72)',
+              fontSize: '11px',
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'all 0.18s ease',
+            }}
+          >
+            <span style={{ color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex' }}>
+              <Icons.Cube />
+            </span>
+            3D Mode
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '1px 6px',
+              borderRadius: '20px',
+              background: 'rgba(251,191,36,0.18)',
+              border: '1.5px solid rgba(251,191,36,0.65)',
+              color: '#fbbf24',
+              fontSize: '8px',
+              fontWeight: 700,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+            }}>
+              Beta
+            </span>
+          </button>
+        )}
 
-        {/* Divider */}
-        <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.20)', margin: '0 2px' }} />
-
-        {/* Fullscreen */}
-        <NavPill
-          label={isFullscreen ? 'EXIT' : 'FULL'}
-          icon={isFullscreen ? Icons.Minimize : Icons.Maximize}
-          active={isFullscreen}
-          onClick={handleFullscreen}
-        />
-      </nav>
+        {/* Admin Login */}
+        <button
+          id="navbar-admin-btn"
+          onClick={onAdminClick}
+          title="Admin login"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px',
+            padding: '8px 16px',
+            borderRadius: '50px',
+            background: PILL_IDLE_BG,
+            backdropFilter: GLASS_BLUR,
+            WebkitBackdropFilter: GLASS_BLUR,
+            boxShadow: GLASS_SHADOW,
+            border: PILL_IDLE_BORDER,
+            color: 'rgba(255,255,255,0.72)',
+            fontSize: '11px',
+            fontWeight: 600,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            outline: 'none',
+            transition: 'all 0.18s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.background = PILL_ACTIVE_BG;
+            e.currentTarget.style.border = PILL_ACTIVE_BORDER;
+            e.currentTarget.style.boxShadow = `${GLASS_SHADOW}, 0 0 14px rgba(108,99,255,0.35)`;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.72)';
+            e.currentTarget.style.background = PILL_IDLE_BG;
+            e.currentTarget.style.border = PILL_IDLE_BORDER;
+            e.currentTarget.style.boxShadow = GLASS_SHADOW;
+          }}
+        >
+          <Icons.Lock />
+          Admin
+        </button>
+      </div>
     </div>
   );
 }

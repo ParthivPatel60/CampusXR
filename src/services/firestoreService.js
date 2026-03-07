@@ -23,6 +23,10 @@ export const addDepartment = async (dept) => {
   return ref.id;
 };
 
+export const updateDepartment = async (deptId, data) => {
+  await updateDoc(doc(db, "departments", deptId), data);
+};
+
 export const deleteDepartment = async (deptId) => {
   const roomsSnap = await getDocs(
     collection(db, "departments", deptId, "rooms")

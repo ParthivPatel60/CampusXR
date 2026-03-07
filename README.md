@@ -4,7 +4,7 @@ A React + Vite app for creating and viewing interactive campus 360° tours with 
 
 ## Quick start
 
-1. Install dependencies
+1. Install frontend dependencies
    ```
    npm install
    ```
@@ -17,55 +17,48 @@ A React + Vite app for creating and viewing interactive campus 360° tours with 
    npm run build
    ```
 
+## Seeding Firestore / Cloudinary (one-time)
+
+```bash
+npm run seed:install   # install scripts/ deps (first time only)
+npm run seed           # upload images & write Firestore metadata
+npm run seed:dry       # dry-run (no writes)
+```
+
 ## Folder structure
 
-campusxr/
-├── public/
-│   └── vite.svg
+CampusXR/                     ← repo root (also the frontend app)
+├── public/                   ← static assets
 ├── src/
 │   ├── assets/
-│   │   ├── react.svg
-│   │   └── Terrace.jpg.jpeg
 │   ├── components/
-│   │   ├── admin/
-│   │   │   └── AdminRoute.jsx
-│   │   ├── layout/
-│   │   │   └── ViewerOverlay.jsx
-│   │   ├── nav/
-│   │   ├── ui/
-│   │   │   ├── HotspotMarker.jsx
-│   │   │   ├── LocationLabel.jsx
-│   │   │   ├── NavbarGlass.jsx
-│   │   │   └── SideControls.jsx
-│   │   └── viewer/
-│   │       └── PanoramaViewer.jsx
+│   │   ├── admin/            ← AdminRoute guard
+│   │   ├── layout/           ← ViewerOverlay
+│   │   ├── ui/               ← NavbarGlass, SideControls, etc.
+│   │   └── viewer/           ← PanoramaViewer (Three.js / Pannellum)
 │   ├── pages/
-│   │   ├── admin/
-│   │   │   ├── AdminPanel.jsx
-│   │   │   └── LoginPage.jsx
+│   │   ├── admin/            ← AdminPanel, LoginPage
 │   │   └── UserTourPage.jsx
 │   ├── services/
 │   │   └── firestoreService.js
 │   ├── cloudinary.js
-│   ├── dataStore.js
+│   ├── dataStore.js          ← deprecated, kept for reference
 │   ├── firebase.js
 │   ├── index.css
 │   └── main.jsx
-├── docs/
-│   ├── api.md
-│   ├── architecture.md
-│   ├── Design_Doc.md
-│   ├── PRD.md
-│   └── Tech_Stack.md
+├── scripts/                  ← one-time Firestore/Cloudinary seed utility
+│   ├── seed.js
+│   ├── seed-manifest.json
+│   └── package.json          ← separate deps (firebase-admin, cloudinary SDK)
+├── docs/                     ← architecture, API, design docs
 ├── eslint.config.js
 ├── index.html
 ├── package.json
-├── package-lock.json
-├── README.md
 ├── vite.config.js
-└── final_ppt.pdf
+└── .gitignore
 
 ## Notes
 
-- Uses Firebase and Cloudinary integrations (see src/).
-- See docs/ for API and architecture details.
+- Firebase config lives in `src/firebase.js` (hardcoded for this project; use `.env` in production).
+- Cloudinary upload helper in `src/cloudinary.js`.
+- See `docs/` for API and architecture details.

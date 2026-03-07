@@ -309,8 +309,18 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         };
         animate();
 
-        // Expose minimal API for zoom/reset controls in parent
-        if (onReady) onReady({ camera, renderer, scene });
+        // Expose minimal API for zoom/reset/orient controls in parent
+        if (onReady) onReady({
+            camera,
+            renderer,
+            scene,
+            reset() {
+                lon = 0; lat = 0;
+                targetLon = 0; targetLat = 0;
+                camera.fov = 75;
+                camera.updateProjectionMatrix();
+            },
+        });
 
         // ── Cleanup ───────────────────────────────────────────────────────────────
         stateRef.current = { renderer, animId };
