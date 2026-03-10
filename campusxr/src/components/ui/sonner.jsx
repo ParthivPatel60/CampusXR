@@ -1,13 +1,39 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useEffect, useState } from "react";
 import { Toaster as Sonner } from "sonner";
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
 const Toaster = ({
   ...props
 }) => {
-  const { theme = "system" } = useTheme()
+  const [theme, setTheme] = useState("system");
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    const getTheme = () => {
+      if (root.classList.contains("dark")) return "dark";
+      if (root.classList.contains("light")) return "light";
+      if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) return "dark";
+      return "system";
+    };
+
+    setTheme(getTheme());
+
+    const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") ?? null;
+    const handleMediaChange = () => setTheme(getTheme());
+
+    mediaQuery?.addEventListener?.("change", handleMediaChange);
+
+    const observer = new MutationObserver(() => setTheme(getTheme()));
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+    return () => {
+      mediaQuery?.removeEventListener?.("change", handleMediaChange);
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <Sonner
