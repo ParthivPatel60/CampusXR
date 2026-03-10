@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 import HotspotEditorViewer from '../../components/admin/HotspotEditorViewer';
+
+gsap.registerPlugin(useGSAP);
 import {
   getDepartments,
   addDepartment,
@@ -50,16 +54,45 @@ export default function AdminPanel() {
   const [deptSearch, setDeptSearch] = useState('');
   const [deletingRoomIds, setDeletingRoomIds] = useState(new Set());
 
-  // Derived totals for overview
-  const totalRooms = Object.values(roomsByDept).reduce((sum, r) => sum + r.length, 0);
-  const totalHotspots = Object.values(hotspotsByRoom).reduce((sum, hs) => sum + hs.length, 0);
-  const infoHotspots = Object.values(hotspotsByRoom).reduce((sum, hs) => sum + hs.filter(h => h.type === 'info').length, 0);
-  const navHotspots = totalHotspots - infoHotspots;
-  const filteredDepts = departments.filter(d =>
-    d.name.toLowerCase().includes(deptSearch.toLowerCase()) ||
-    (d.description || '').toLowerCase().includes(deptSearch.toLowerCase())
+  // Derived totals for overview — memoised so they only recompute when data changes
+  const totalRooms = useMemo(
+    () => Object.values(roomsByDept).reduce((sum, r) => sum + r.length, 0),
+    [roomsByDept],
   );
+  const totalHotspots = useMemo(
+    () => Object.values(hotspotsByRoom).reduce((sum, hs) => sum + hs.length, 0),
+    [hotspotsByRoom],
+  );
+  const infoHotspots = useMemo(
+    () => Object.values(hotspotsByRoom).reduce((sum, hs) => sum + hs.filter(h => h.type === 'info').length, 0),
+    [hotspotsByRoom],
+  );
+  const navHotspots = useMemo(() => totalHotspots - infoHotspots, [totalHotspots, infoHotspots]);
+  const filteredDepts = useMemo(
+    () => departments.filter(d =>
+      d.name.toLowerCase().includes(deptSearch.toLowerCase()) ||
+      (d.description || '').toLowerCase().includes(deptSearch.toLowerCase())
+    ),
+    [departments, deptSearch],
+  );
+  /* ── GSAP ────────────────────────────────────────────────────────────── */
+  const sidebarRef       = useRef(null);
+  const mainRef          = useRef(null);
+  const isFirstRender    = useRef(true); // skip tab-change anim on initial mount
 
+  // Mount animation — sidebar slides in from left, main area from right
+  useGSAP(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    if (sidebarRef.current) tl.from(sidebarRef.current, { x: -20, opacity: 0, duration: 0.45 });
+    if (mainRef.current)    tl.from(mainRef.current,    { x: 16,  opacity: 0, duration: 0.40 }, '-=0.25');
+  }, []);
+
+  // Tab-change animation — content slides up when switching tabs (skips on mount)
+  useGSAP(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (!mainRef.current) return;
+    gsap.from(mainRef.current, { y: 6, opacity: 0, duration: 0.22, ease: 'power2.out' });
+  }, [activeTab]);
   // ── Helpers ───────────────────────────────────────────────────────────────
   const fetchDepartments = useCallback(async () => {
     const depts = await getDepartments();
@@ -208,7 +241,7 @@ export default function AdminPanel() {
     <div style={{ display: 'flex', height: '100vh', background: '#f1f5f9', fontFamily: "'Inter', system-ui, sans-serif", overflow: 'hidden' }}>
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <div style={{ width: 220, background: '#0f172a', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
+      <div ref={sidebarRef} style={{ width: 220, background: '#0f172a', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
         {/* Logo */}
         <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src="/logo.png" alt="CampusXR" style={{ height: 38, width: 'auto', objectFit: 'contain' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
@@ -246,7 +279,7 @@ export default function AdminPanel() {
       </div>
 
       {/* ── Main area ────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div ref={mainRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* ════════════════════ DASHBOARD ════════════════════════════════ */}
         {activeTab === 'overview' && (

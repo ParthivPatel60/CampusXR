@@ -107,7 +107,7 @@ function NavPill({ label, icon: Icon, active = false, onClick }) {
         /* Interaction */
         cursor: 'pointer',
         userSelect: 'none',
-        transition: 'all 0.18s ease',
+        transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease',
         transform: hovered && !active ? 'translateY(-1px)' : 'none',
         outline: 'none',
       }}
@@ -188,7 +188,7 @@ export default function NavbarGlass({
               textTransform: 'uppercase',
               cursor: 'pointer',
               outline: 'none',
-              transition: 'all 0.18s ease',
+              transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
             }}
           >
             <span style={{ color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex' }}>
@@ -236,7 +236,7 @@ export default function NavbarGlass({
             textTransform: 'uppercase',
             cursor: 'pointer',
             outline: 'none',
-            transition: 'all 0.18s ease',
+            transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
           }}
           onMouseEnter={e => {
             e.currentTarget.style.color = '#ffffff';

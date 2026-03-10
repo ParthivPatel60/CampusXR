@@ -83,8 +83,8 @@ export default function HotspotMarker({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: hovered ? '48px' : '38px',
-                height: hovered ? '48px' : '38px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
                 border: `3px solid ${c.ring}`,
                 background: hovered ? `${c.glow}` : 'rgba(255,255,255,0.08)',
@@ -93,19 +93,21 @@ export default function HotspotMarker({
                 boxShadow: hovered
                     ? `0 0 0 6px ${c.glow.replace('0.60', '0.20')}, 0 0 28px ${c.glowHov}, 0 4px 16px rgba(0,0,0,0.40)`
                     : `0 0 16px ${c.glow}, 0 4px 12px rgba(0,0,0,0.30)`,
-                transition: 'all 0.18s ease',
+                transform: hovered ? 'scale(1.26)' : 'scale(1)', // compositor-only, no layout reflow
+                transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease',
             }}>
                 {/* ── Inner dot ── */}
                 <span style={{
-                    width: hovered ? '18px' : '14px',
-                    height: hovered ? '18px' : '14px',
+                    width: '14px',
+                    height: '14px',
                     borderRadius: '50%',
                     background: c.dot,
                     boxShadow: `0 0 10px ${c.glow}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    transition: 'all 0.18s ease',
+                    transform: hovered ? 'scale(1.29)' : 'scale(1)', // 18/14 ratio via scale
+                    transition: 'transform 0.18s ease',
                     color: '#fff',
                     fontSize: '9px',
                     fontWeight: 800,

@@ -88,7 +88,8 @@ body,
   -webkit-backdrop-filter: blur(var(--blur-glass));
   border-radius: var(--radius-glass-pill);
   border: 3px solid rgba(255, 255, 255, 0.6);
-  transition: all 0.25s ease;
+  /* Specific props only — avoids transitioning layout-triggering properties */
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
 
 .glass-pill:hover {
@@ -109,7 +110,7 @@ body,
   -webkit-backdrop-filter: blur(var(--blur-glass));
   border-radius: var(--radius-glass-circle);
   border: 3px solid rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .glass-circle:hover {
@@ -172,5 +173,21 @@ body,
   50% {
     opacity: 0.55;
     box-shadow: 0 0 14px rgba(52, 211, 153, 1);
+  }
+}
+
+/* Spinner for loading overlay */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Reduced-motion: zero out all CSS animations and transitions ──────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

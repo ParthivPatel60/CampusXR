@@ -1,6 +1,17 @@
 export const CLOUD_NAME = "dsdll4n92";
 export const UPLOAD_PRESET = "campusxr_unsigned";
 
+/**
+ * Returns a Cloudinary URL with on-the-fly resizing and optimisation.
+ * Inserts w_<W>,h_<H>,c_fill,q_auto,f_auto between /upload/ and the public-id.
+ * Requests 2× pixel density by default so thumbnails look crisp on retina displays.
+ * Falls back to the original URL for non-Cloudinary sources.
+ */
+export function getCloudinaryThumb(url, w = 152, h = 88) {
+  if (!url || !url.includes('/upload/')) return url;
+  return url.replace('/upload/', `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
+}
+
 export async function uploadImageToCloudinary(file) {
   const formData = new FormData();
   formData.append("file", file);
