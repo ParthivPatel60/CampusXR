@@ -26,29 +26,10 @@ import { useGSAP } from '@gsap/react';
 
 import ViewerOverlay from '../components/layout/ViewerOverlay';
 import PanoramaViewer from '../components/viewer/PanoramaViewer';
-import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
+import { useTourData } from '../hooks/useTourData';
+import { GLASS_BG as G_BG, GLASS_SHADOW as G_SHADOW, GLASS_BLUR as G_BLUR, PILL_STYLE, PILL_ACTIVE_STYLE } from '../constants/glassTokens';
 
 gsap.registerPlugin(useGSAP);
-
-/* ─── Glass design tokens ─────────────────────────────────────────────────── */
-const G_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
-const G_SHADOW = 'inset -2px -2px 100px rgba(255,255,255,0.1), inset 2px 2px 100px rgba(66,66,66,0.1)';
-const G_BLUR = 'blur(25px)';
-
-/* Pill/button variants */
-const PILL_STYLE = {
-  background: 'rgba(255,255,255,0.10)',
-  boxShadow: G_SHADOW,
-  backdropFilter: G_BLUR,
-  WebkitBackdropFilter: G_BLUR,
-  borderRadius: '50px',
-  border: '2px solid rgba(255,255,255,0.30)',
-};
-const PILL_ACTIVE_STYLE = {
-  ...PILL_STYLE,
-  background: 'rgba(108,99,255,0.30)',
-  border: '2px solid rgba(255,255,255,0.72)',
-};
 
 /* ─── Chevron icon ────────────────────────────────────────────────────────── */
 const ChevronDown = () => (
@@ -78,11 +59,9 @@ const SearchIcon = () => (
 export default function UserTourPage() {
 
   /* ── State ───────────────────────────────────────────────────────────────── */
+  const { departments, rooms, hotspots, activeDeptId, setActiveDeptId, activeRoom, setActiveRoom } = useTourData();
+
   const [activeDept, setActiveDept] = useState('All Departments');
-  const [activeRoom, setActiveRoom] = useState(null);
-  const [departments, setDepartments] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [activeDeptId, setActiveDeptId] = useState(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [splatMounted, setSplatMounted] = useState(false);
@@ -93,7 +72,6 @@ export default function UserTourPage() {
   const [deptOpen, setDeptOpen] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(true);
-  const [hotspots, setHotspots] = useState([]);
 
   /* ── Refs ────────────────────────────────────────────────────────────────── */
   const bottomNavRef = useRef(null);
@@ -180,41 +158,9 @@ export default function UserTourPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is3DMode, splatMounted]);
 
-  /* ── Data loading ────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    getDepartments().then((depts) => {
-      setDepartments(depts);
-      // Do not auto-select a dept — "All Departments" is the default
-    });
-  }, []);
-
-  useEffect(() => {
-    if (activeDeptId === null) {
-      // All Departments: fetch rooms from every dept in parallel
-      if (departments.length === 0) return;
-      Promise.all(
-        departments.map(d =>
-          getRooms(d.id).then(rs => rs.map(r => ({ ...r, deptId: d.id, deptName: d.name })))
-        )
-      ).then(allRooms => {
-        const flat = allRooms.flat();
-        setRooms(flat);
-        setActiveRoom(flat.length > 0 ? flat[0] : null);
-      });
-      return;
-    }
-    getRooms(activeDeptId).then((r) => {
-      setRooms(r);
-      setActiveRoom(r.length > 0 ? r[0] : null);
-    });
-  }, [activeDeptId, departments]);
-
+  /* ── Reset 3D mode on room / dept change ─────────────────────────────────── */
   useEffect(() => {
     setIs3DMode(false);
-    // In "All Departments" mode, the room carries its own deptId
-    const deptId = activeDeptId ?? activeRoom?.deptId;
-    if (!activeRoom?.id || !deptId) { setHotspots([]); return; }
-    getHotspots(deptId, activeRoom.id).then(setHotspots);
   }, [activeRoom, activeDeptId]);
 
   /* ── Auto-advance tour ───────────────────────────────────────────────────── */

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import HotspotEditorViewer from '../../components/admin/HotspotEditorViewer';
+import HotspotEditorViewer from '../../components/viewer/HotspotEditorViewer';
 import {
   getDepartments,
   addDepartment,
@@ -12,7 +12,7 @@ import {
   addHotspot,
   deleteHotspot,
 } from '../../services/firestoreService';
-import { uploadImageToCloudinary } from '../../cloudinary';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('overview');

@@ -1,5 +1,4 @@
-export const CLOUD_NAME = "dsdll4n92";
-export const UPLOAD_PRESET = "campusxr_unsigned";
+﻿import { CLOUD_NAME, UPLOAD_PRESET } from "../config/cloudinary";
 
 export async function uploadImageToCloudinary(file) {
   const formData = new FormData();

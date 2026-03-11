@@ -17,17 +17,7 @@
 
 import React, { useState } from 'react';
 import logoSrc from '../../assets/logo.png';
-
-/* ─── Design tokens ─────────────────────────────────────────────────────────── */
-const GLASS_BG = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
-const GLASS_SHADOW = 'inset -2px -2px 100px rgba(255,255,255,0.1), inset 2px 2px 100px rgba(66,66,66,0.1)';
-const GLASS_BLUR = 'blur(25px)';
-
-/* Active pill: slightly brighter indigo tint to reinforce selection */
-const PILL_ACTIVE_BG = 'rgba(108,99,255,0.30)';
-const PILL_ACTIVE_BORDER = '2px solid rgba(255,255,255,0.80)';
-const PILL_IDLE_BG = 'rgba(255,255,255,0.08)';
-const PILL_IDLE_BORDER = '2px solid rgba(255,255,255,0.28)';
+import { GLASS_SHADOW, GLASS_BLUR, PILL_ACTIVE_BG, PILL_ACTIVE_BORDER, PILL_IDLE_BG, PILL_IDLE_BORDER } from '../../constants/glassTokens';
 
 /* ─── SVG icon set ─────────────────────────────────────────────────────────── */
 const Icons = {

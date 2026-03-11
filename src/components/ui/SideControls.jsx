@@ -18,13 +18,7 @@
  */
 
 import React, { useState } from 'react';
-
-/* ─── Glass tokens (UNCHANGED) ──────────────────────────────────────────── */
-const PANEL_BG     = 'linear-gradient(247.52deg, rgba(108,99,255,0.17) 1.52%, rgba(255,255,255,0) 96.99%)';
-const PANEL_SHADOW = 'inset -2px -2px 100px rgba(255,255,255,0.1), inset 2px 2px 100px rgba(66,66,66,0.1)';
-const BLUR         = 'blur(25px)';
-const BTN_BG       = 'rgba(255,255,255,0.10)';
-const BTN_BORDER   = '2px solid rgba(255,255,255,0.28)';
+import { GLASS_BG as PANEL_BG, GLASS_SHADOW as PANEL_SHADOW, GLASS_BLUR as BLUR, BTN_BG, BTN_BORDER } from '../../constants/glassTokens';
 
 /* ─── Tiny SVG icons ─────────────────────────────────────────────────────── */
 const IC = {
