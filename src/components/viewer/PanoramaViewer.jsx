@@ -14,7 +14,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 // ── Inline hotspot styles — mirrors HotspotMarker.jsx design tokens ──────────
@@ -73,7 +73,7 @@ function buildMarkerEl(hs, onClickCb) {
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
         boxShadow: `0 0 16px ${c.glow}, 0 4px 12px rgba(0,0,0,0.30)`,
-        transition: 'all 0.18s ease',
+        transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease',
     });
 
     // Inner dot
@@ -91,7 +91,7 @@ function buildMarkerEl(hs, onClickCb) {
         fontSize: '9px',
         fontWeight: '800',
         lineHeight: '1',
-        transition: 'all 0.18s ease',
+        transition: 'transform 0.18s ease',
     });
     dot.textContent = c.icon;
     ring.appendChild(dot);
@@ -127,18 +127,14 @@ function buildMarkerEl(hs, onClickCb) {
     btn.addEventListener('mouseenter', () => {
         tooltip.style.opacity = '1';
         ring.style.background = c.glow;
-        ring.style.width = '48px';
-        ring.style.height = '48px';
-        dot.style.width = '18px';
-        dot.style.height = '18px';
+        ring.style.transform = 'scale(1.26)'; // 48/38 — compositor-only, no layout reflow
+        dot.style.transform = 'scale(1.29)';  // 18/14
     });
     btn.addEventListener('mouseleave', () => {
         tooltip.style.opacity = '0';
         ring.style.background = 'rgba(255,255,255,0.08)';
-        ring.style.width = '38px';
-        ring.style.height = '38px';
-        dot.style.width = '14px';
-        dot.style.height = '14px';
+        ring.style.transform = 'scale(1)';
+        dot.style.transform = 'scale(1)';
     });
     btn.addEventListener('click', (e) => { e.stopPropagation(); onClickCb(hs); });
 
@@ -268,12 +264,23 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     const arrowsAnchorRef = useRef(null);
     const stateRef = useRef({});
 
+    // Loading progress state — shown until texture decodes
+    const [loadProgress, setLoadProgress] = useState(0);
+    const [textureLoaded, setTextureLoaded] = useState(false);
+    // Reset whenever the panorama image changes
+    useEffect(() => { setLoadProgress(0); setTextureLoaded(false); }, [imageURL]);
+
     // Mutable refs let the animation loop always read the latest values
     // without re-initialising the entire Three.js scene.
     const hotspotsRef = useRef(hotspots);
+    // Pre-filtered navigation hotspots — avoids a .filter() call inside the 60fps loop
+    const navHotspotsRef = useRef(hotspots.filter(h => h.type === 'navigation'));
     const onClickRef = useRef(onHotspotClick);
 
-    useEffect(() => { hotspotsRef.current = hotspots; }, [hotspots]);
+    useEffect(() => {
+        hotspotsRef.current = hotspots;
+        navHotspotsRef.current = hotspots.filter(h => h.type === 'navigation');
+    }, [hotspots]);
     useEffect(() => { onClickRef.current = onHotspotClick; }, [onHotspotClick]);
 
     // ── Rebuild marker DOM elements whenever the hotspot array changes ────────
@@ -320,11 +327,16 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         camera.position.set(0, 0, 0.001);
 
         // ── Sphere ────────────────────────────────────────────────────────────────
-        const geometry = new THREE.SphereGeometry(500, 60, 40);
+        const geometry = new THREE.SphereGeometry(500, 48, 32); // 48×32 is imperceptibly smoother vs 60×40 but ~36% fewer vertices
         geometry.scale(-1, 1, 1); // flip normals → render inside
 
-        const texture = new THREE.TextureLoader().load(imageURL);
+        const manager = new THREE.LoadingManager();
+        manager.onProgress = (_, loaded, total) => setLoadProgress(Math.round(loaded / total * 100));
+        manager.onLoad = () => setTextureLoaded(true);
+        const texture = new THREE.TextureLoader(manager).load(imageURL);
         texture.colorSpace = THREE.SRGBColorSpace;
+        texture.generateMipmaps = false;       // panoramic textures don't benefit from mipmaps
+        texture.minFilter = THREE.LinearFilter; // saves ~33% GPU texture memory
         const material = new THREE.MeshBasicMaterial({ map: texture });
         const sphere = new THREE.Mesh(geometry, material);
         scene.add(sphere);
@@ -351,6 +363,35 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         };
         const onPointerUp = () => { isPointerDown = false; };
 
+        // ── Touch pinch-to-zoom ───────────────────────────────────────────────────
+        let lastPinchDist = 0;
+        let isPinching = false;
+        const onTouchStart = (e) => {
+            if (e.touches.length === 2) {
+                isPinching = true;
+                isPointerDown = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+            } else {
+                isPinching = false;
+                onPointerDown(e);
+            }
+        };
+        const onTouchMove = (e) => {
+            if (e.touches.length === 2 && isPinching) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const delta = lastPinchDist - dist;
+                camera.fov = Math.max(30, Math.min(100, camera.fov + delta * 0.05));
+                camera.updateProjectionMatrix();
+                lastPinchDist = dist;
+            } else if (!isPinching) {
+                onPointerMove(e);
+            }
+        };
+
         // Scroll / pinch zoom
         const onWheel = (e) => {
             camera.fov = Math.max(30, Math.min(100, camera.fov + e.deltaY * 0.05));
@@ -362,8 +403,8 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         mount.addEventListener('pointerup', onPointerUp);
         mount.addEventListener('pointerleave', onPointerUp);
         mount.addEventListener('wheel', onWheel, { passive: true });
-        mount.addEventListener('touchstart', onPointerDown, { passive: true });
-        mount.addEventListener('touchmove', onPointerMove, { passive: true });
+        mount.addEventListener('touchstart', onTouchStart, { passive: true });
+        mount.addEventListener('touchmove', onTouchMove, { passive: true });
         mount.addEventListener('touchend', onPointerUp);
 
         // ── Resize handler ────────────────────────────────────────────────────────
@@ -441,7 +482,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             // ── Street-View arrows: project each independently like hotspot markers ──
             const arrowAnchor = arrowsAnchorRef.current;
             if (arrowAnchor) {
-                const navList = hotspotsRef.current.filter(h => h.type === 'navigation');
+                const navList = navHotspotsRef.current; // pre-filtered; no allocation per frame
                 const arrowEls = arrowAnchor.children;
                 const w2 = mount.clientWidth;
                 const h2 = mount.clientHeight;
@@ -475,8 +516,9 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     // Arrow screen-X tracks the hotspot; Y is clamped to lower 30% of screen
                     const clampedY = Math.max(h2 * 0.62, Math.min(h2 * 0.88, sy));
 
-                    // Screen-space rotation: angle from clamped arrow pos → actual hotspot pos
-                    const dx = sx - parseFloat(el.style.left || w2 / 2);
+                    // Screen-space rotation: arrow X is always forced to hotspot X (sx),
+                    // so only the vertical delta matters for the rotation angle.
+                    const dx = 0;
                     const dy = sy - clampedY;
                     // Compute angle so the arrow tip (top of SVG) points toward the hotspot
                     const screenAngle = Math.atan2(dx, -dy) * (180 / Math.PI);
@@ -527,8 +569,8 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             mount.removeEventListener('pointerup', onPointerUp);
             mount.removeEventListener('pointerleave', onPointerUp);
             mount.removeEventListener('wheel', onWheel);
-            mount.removeEventListener('touchstart', onPointerDown);
-            mount.removeEventListener('touchmove', onPointerMove);
+            mount.removeEventListener('touchstart', onTouchStart);
+            mount.removeEventListener('touchmove', onTouchMove);
             mount.removeEventListener('touchend', onPointerUp);
             renderer.dispose();
             if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
@@ -541,7 +583,33 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             className="absolute inset-0 w-full h-full"
             style={{ touchAction: 'none', cursor: 'grab' }}
         >
-            {/* Hotspot markers — created imperatively, positioned by projection in animate() */}
+            {/* Panorama loading progress — overlays canvas until texture decodes */}
+            {imageURL && !textureLoaded && (
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 5,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: 'radial-gradient(ellipse at center, rgba(30,27,75,0.97) 0%, rgba(15,15,26,0.99) 100%)',
+                    pointerEvents: 'none',
+                }}>
+                    <div style={{ width: '180px', height: '3px', background: 'rgba(255,255,255,0.10)', borderRadius: '9999px', overflow: 'hidden' }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${loadProgress}%`,
+                            background: 'linear-gradient(90deg, rgb(108,99,255), rgb(168,162,255))',
+                            borderRadius: '9999px',
+                            transition: 'width 0.25s ease',
+                        }} />
+                    </div>
+                    <p style={{
+                        color: 'rgba(255,255,255,0.45)', fontSize: '11px',
+                        marginTop: '12px', fontFamily: 'Montserrat, sans-serif',
+                        letterSpacing: '0.04em',
+                    }}>
+                        {loadProgress < 100 ? `Loading… ${loadProgress}%` : 'Preparing view…'}
+                    </p>
+                </div>
+            )}
+            {/* Hotspot markers — created imperatively, positioned by projection in animate() */}}
             <div
                 ref={markersContainerRef}
                 style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}
