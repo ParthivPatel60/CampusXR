@@ -110,8 +110,6 @@ function NavPill({ label, icon: Icon, active = false, onClick }) {
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
 export default function NavbarGlass({
-  activeNav = '',
-  onNavClick,
   is3DMode = false,
   onToggle3D,
   show3DToggle = false,

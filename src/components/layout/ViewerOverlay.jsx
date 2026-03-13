@@ -33,8 +33,6 @@ import SideControls from '../ui/SideControls';
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function ViewerOverlay({
-    activeRoom = { name: 'Terrace' },
-    activeDept = '',
     activeNav = '',
     onNavClick,
     onZoomIn,

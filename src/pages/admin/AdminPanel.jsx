@@ -1,14 +1,9 @@
-<<<<<<< HEAD
-import React, { useState, useEffect, useCallback } from 'react';
-import HotspotEditorViewer from '../../components/viewer/HotspotEditorViewer';
-=======
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import HotspotEditorViewer from '../../components/admin/HotspotEditorViewer';
+import HotspotEditorViewer from '../../components/viewer/HotspotEditorViewer';
 
 gsap.registerPlugin(useGSAP);
->>>>>>> f31b8ca784cabe5b7853912424a4248ebcf24f6f
 import {
   getDepartments,
   addDepartment,
@@ -191,7 +186,7 @@ export default function AdminPanel() {
       setNewRoomFile(null);
       setShowAddRoom(false);
       await loadRoomsForDept(selectedRoomsDeptId);
-    } catch (err) {
+    } catch {
       setRoomUploadError('Upload failed. Please try again.');
     } finally {
       setRoomUploading(false);

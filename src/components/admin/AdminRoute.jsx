@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../config/firebase";
+import { getFirebaseAuth } from "../../config/firebase";
 
 export default function AdminRoute({ children }) {
   const [status, setStatus] = useState("loading");
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(getFirebaseAuth(), (user) => {
       if (user) {
         setStatus("auth");
       } else {

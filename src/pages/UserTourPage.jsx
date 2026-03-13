@@ -27,13 +27,9 @@ import { useGSAP } from '@gsap/react';
 
 import ViewerOverlay from '../components/layout/ViewerOverlay';
 import PanoramaViewer from '../components/viewer/PanoramaViewer';
-<<<<<<< HEAD
-import { useTourData } from '../hooks/useTourData';
 import { GLASS_BG as G_BG, GLASS_SHADOW as G_SHADOW, GLASS_BLUR as G_BLUR, PILL_STYLE, PILL_ACTIVE_STYLE } from '../constants/glassTokens';
-=======
 import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
-import { getCloudinaryThumb } from '../cloudinary';
->>>>>>> f31b8ca784cabe5b7853912424a4248ebcf24f6f
+import { getCloudinaryThumb } from '../services/cloudinaryService';
 
 gsap.registerPlugin(useGSAP);
 
@@ -68,7 +64,11 @@ export default function UserTourPage() {
   const navigate = useNavigate();
 
   /* ── State ───────────────────────────────────────────────────────────────── */
-  const { departments, rooms, hotspots, activeDeptId, setActiveDeptId, activeRoom, setActiveRoom } = useTourData();
+  const [departments, setDepartments] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [hotspots, setHotspots] = useState([]);
+  const [activeDeptId, setActiveDeptId] = useState(null);
+  const [activeRoom, setActiveRoom] = useState(null);
 
   const [activeDept, setActiveDept] = useState('All Departments');
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -81,14 +81,10 @@ export default function UserTourPage() {
   const [deptOpen, setDeptOpen] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(true);
-<<<<<<< HEAD
-=======
-  const [hotspots, setHotspots] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [visitHistory, setVisitHistory] = useState([]); // [current, prev, …] max 5
   const [copiedLink, setCopiedLink] = useState(false);
->>>>>>> f31b8ca784cabe5b7853912424a4248ebcf24f6f
 
   /* ── Refs ────────────────────────────────────────────────────────────────── */
   const bottomNavRef = useRef(null);
@@ -174,7 +170,7 @@ export default function UserTourPage() {
       if (prev[0]?.id === activeRoom.id) return prev;
       return [activeRoom, ...prev.filter(r => r.id !== activeRoom.id)].slice(0, 5);
     });
-  }, [activeRoom?.id]);
+  }, [activeRoom]);
 
   /* ── Close dept dropdown on outside click ──────────────────────────────── */
   useEffect(() => {
@@ -274,30 +270,43 @@ export default function UserTourPage() {
       if (bottomNavRef.current) gsap.to(bottomNavRef.current, { opacity: 1, y: 0, duration: 0.38, delay: DELAY + 0.04, ease: 'power3.out' });
       if (tourGuideRef.current) gsap.to(tourGuideRef.current, { opacity: 1, y: 0, duration: 0.38, delay: DELAY + 0.09, ease: 'power3.out' });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is3DMode, splatMounted]);
 
-<<<<<<< HEAD
-  /* ── Reset 3D mode on room / dept change ─────────────────────────────────── */
-=======
   /* ── Data loading ────────────────────────────────────────────────────────── */
+  const withTimeout = useCallback((promise, ms, message) => {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+  }, []);
+
   const loadCampusData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const depts = await getDepartments();
+      const depts = await withTimeout(
+        getDepartments(),
+        12000,
+        'Campus data request timed out.'
+      );
       setDepartments(depts);
       // Apply URL dept param on first load
       if (initialDeptIdRef.current) {
         const dept = depts.find(d => d.id === initialDeptIdRef.current);
         if (dept) { setActiveDept(dept.name); setActiveDeptId(initialDeptIdRef.current); }
       }
-    } catch {
-      setLoadError('Could not connect to campus data. Please check your connection.');
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('timed out') || message.includes('blocked')) {
+        setLoadError('Campus data request timed out. Check ad/tracker blockers, firewall, and Firebase config, then try again.');
+      } else {
+        setLoadError('Could not connect to campus data. Please check your connection and Firebase configuration.');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [withTimeout]);
 
   useEffect(() => { loadCampusData(); }, [loadCampusData]);
 
@@ -330,7 +339,22 @@ export default function UserTourPage() {
     });
   }, [activeDeptId, departments]);
 
->>>>>>> f31b8ca784cabe5b7853912424a4248ebcf24f6f
+  useEffect(() => {
+    let cancelled = false;
+    const deptId = activeDeptId ?? activeRoom?.deptId;
+    if (!activeRoom?.id || !deptId) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setHotspots([]);
+      });
+      return () => { cancelled = true; };
+    }
+    getHotspots(deptId, activeRoom.id).then((data) => {
+      if (!cancelled) setHotspots(data);
+    });
+    return () => { cancelled = true; };
+  }, [activeDeptId, activeRoom]);
+
+  /* ── Reset 3D mode on room / dept change ─────────────────────────────────── */
   useEffect(() => {
     setIs3DMode(false);
   }, [activeRoom, activeDeptId]);

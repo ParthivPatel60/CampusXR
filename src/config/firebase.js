@@ -13,6 +13,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+let authInstance = null;
 
 export const db = getFirestore(app);
-export const auth = getAuth(app);
+
+export const getFirebaseAuth = () => {
+  if (!authInstance) {
+    authInstance = getAuth(app);
+  }
+  return authInstance;
+};

@@ -33,9 +33,18 @@ export function useTourData() {
   }, [activeDeptId, departments]);
 
   useEffect(() => {
+    let cancelled = false;
     const deptId = activeDeptId ?? activeRoom?.deptId;
-    if (!activeRoom?.id || !deptId) { setHotspots([]); return; }
-    getHotspots(deptId, activeRoom.id).then(setHotspots);
+    if (!activeRoom?.id || !deptId) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setHotspots([]);
+      });
+      return () => { cancelled = true; };
+    }
+    getHotspots(deptId, activeRoom.id).then((data) => {
+      if (!cancelled) setHotspots(data);
+    });
+    return () => { cancelled = true; };
   }, [activeRoom, activeDeptId]);
 
   return { departments, rooms, hotspots, activeDeptId, setActiveDeptId, activeRoom, setActiveRoom };

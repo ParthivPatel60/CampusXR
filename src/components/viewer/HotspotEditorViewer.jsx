@@ -23,17 +23,6 @@ import * as THREE from 'three';
 
 const GEO_R = 500;
 
-/** Convert pitch + yaw (degrees) to a world point on the sphere. */
-function pitchYawToWorld(pitch, yaw) {
-  const phi   = THREE.MathUtils.degToRad(90 - pitch);
-  const theta = THREE.MathUtils.degToRad(yaw);
-  return new THREE.Vector3(
-    GEO_R * Math.sin(phi) * Math.cos(theta),
-    GEO_R * Math.cos(phi),
-    GEO_R * Math.sin(phi) * Math.sin(theta),
-  );
-}
-
 /** Convert an intersection point on the sphere back to pitch + yaw. */
 function worldToPitchYaw(v) {
   const r = v.length();

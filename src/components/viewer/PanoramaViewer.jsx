@@ -152,7 +152,6 @@ function buildMarkerEl(hs, onClickCb) {
  */
 function buildArrowEl(hs, onClickCb) {
     const ns = 'http://www.w3.org/2000/svg';
-    const fId = `nav-arrow-${String(hs.id || Math.random()).replace(/\W/g, '_')}`;
 
     // Outer wrapper — positioned absolutely by the animate loop
     const wrapper = document.createElement('div');
@@ -267,8 +266,6 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     // Loading progress state — shown until texture decodes
     const [loadProgress, setLoadProgress] = useState(0);
     const [textureLoaded, setTextureLoaded] = useState(false);
-    // Reset whenever the panorama image changes
-    useEffect(() => { setLoadProgress(0); setTextureLoaded(false); }, [imageURL]);
 
     // Mutable refs let the animation loop always read the latest values
     // without re-initialising the entire Three.js scene.
@@ -276,12 +273,14 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     // Pre-filtered navigation hotspots — avoids a .filter() call inside the 60fps loop
     const navHotspotsRef = useRef(hotspots.filter(h => h.type === 'navigation'));
     const onClickRef = useRef(onHotspotClick);
+    const onReadyRef = useRef(onReady);
 
     useEffect(() => {
         hotspotsRef.current = hotspots;
         navHotspotsRef.current = hotspots.filter(h => h.type === 'navigation');
     }, [hotspots]);
     useEffect(() => { onClickRef.current = onHotspotClick; }, [onHotspotClick]);
+    useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
     // ── Rebuild marker DOM elements whenever the hotspot array changes ────────
     useEffect(() => {
@@ -542,7 +541,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         animate();
 
         // Expose minimal API for zoom/reset/orient controls in parent
-        if (onReady) onReady({
+        if (onReadyRef.current) onReadyRef.current({
             camera,
             renderer,
             scene,
@@ -609,7 +608,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     </p>
                 </div>
             )}
-            {/* Hotspot markers — created imperatively, positioned by projection in animate() */}}
+            {/* Hotspot markers — created imperatively, positioned by projection in animate() */}
             <div
                 ref={markersContainerRef}
                 style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}

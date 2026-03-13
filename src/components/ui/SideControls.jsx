@@ -85,7 +85,7 @@ const IC = {
 };
 
 /* ─── Generic glass button ───────────────────────────────────────────────── */
-function GBtn({ icon: Icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
+function GBtn({ icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
                 tooltipSide = 'right' }) {
     const [hov, setHov] = useState(false);
     const [prs, setPrs] = useState(false);
@@ -120,7 +120,7 @@ function GBtn({ icon: Icon, label, onClick, size = 40, glow = 'rgba(200,200,255,
                     flexShrink: 0,
                 }}
             >
-                <Icon />
+                {React.createElement(icon)}
             </button>
             {hov && (
                 <span style={{

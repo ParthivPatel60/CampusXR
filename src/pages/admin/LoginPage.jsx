@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { getFirebaseAuth } from '../../config/firebase';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -13,9 +13,9 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
       navigate('/admin');
-    } catch (err) {
+    } catch {
       setError('Invalid email or password. Please try again.');
     }
   };
