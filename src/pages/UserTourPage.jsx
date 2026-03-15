@@ -82,6 +82,7 @@ export default function UserTourPage() {
   const [deptOpen, setDeptOpen] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(true);
+  const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [visitHistory, setVisitHistory] = useState([]); // [current, prev, …] max 5
@@ -791,7 +792,38 @@ export default function UserTourPage() {
           willChange: 'transform, opacity',
         }}
       >
+        {isBottomNavCollapsed ? (
+          <button
+            onClick={() => setIsBottomNavCollapsed(false)}
+            title="Expand bottom panel"
+            style={{
+              background: G_BG,
+              backdropFilter: G_BLUR,
+              WebkitBackdropFilter: G_BLUR,
+              boxShadow: `${G_SHADOW}, 0 8px 28px rgba(0,0,0,0.28)`,
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.20)',
+              color: 'rgba(255,255,255,0.86)',
+              fontSize: '11px',
+              fontWeight: 700,
+              fontFamily: 'Montserrat, sans-serif',
+              letterSpacing: '0.03em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <span style={{ display: 'inline-flex', transform: 'rotate(180deg)', lineHeight: 0 }}>
+              <ChevronDown />
+            </span>
+            Rooms
+          </button>
+        ) : (
         <div style={{
+          position: 'relative',
           background: G_BG,
           backdropFilter: G_BLUR,
           WebkitBackdropFilter: G_BLUR,
@@ -804,6 +836,31 @@ export default function UserTourPage() {
           alignItems: 'center',
           width: '100%',
         }}>
+        <button
+          onClick={() => setIsBottomNavCollapsed(true)}
+          title="Collapse bottom panel"
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '10px',
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.22)',
+            background: 'rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.72)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            outline: 'none',
+            zIndex: 2,
+          }}
+        >
+          <span style={{ display: 'inline-flex', lineHeight: 0 }}>
+            <ChevronDown />
+          </span>
+        </button>
         {/* Room thumbnail cards — GSAP-animated slide wrapper */}
         <div ref={roomListRef} style={{ overflow: 'hidden' }}>
           <div
@@ -1068,7 +1125,8 @@ export default function UserTourPage() {
             )}
           </button>
         </div>
-        </div>{/* end unified glass wrapper */}
+        </div>
+        )}
       </div>
 
       {/* ═══ BOTTOM-RIGHT: Merged Tour Guide Panel ══════════════════════ */}
