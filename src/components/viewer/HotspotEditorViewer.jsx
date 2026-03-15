@@ -156,6 +156,22 @@ export default function HotspotEditorViewer({
     const raycaster = new THREE.Raycaster();
     const ndc       = new THREE.Vector2();
 
+    // Keep renderer + camera in sync with container size changes, including
+    // animated width transitions when the editor sidebar opens/closes.
+    let lastW = 0;
+    let lastH = 0;
+    const syncSize = () => {
+      const w = mount.clientWidth;
+      const h = mount.clientHeight;
+      if (!w || !h) return;
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+
     // ── Pointer handlers ──────────────────────────────────────────────────
     const onPointerDown = (e) => {
       isDown = true; dragDist = 0;
@@ -195,19 +211,23 @@ export default function HotspotEditorViewer({
       camera.updateProjectionMatrix();
       emitView();
     };
-    const onResize = () => {
-      renderer.setSize(mount.clientWidth, mount.clientHeight);
-      camera.aspect = mount.clientWidth / mount.clientHeight;
-      camera.updateProjectionMatrix();
-    };
+    const onResize = () => { syncSize(); };
+    const onPointerLeave = () => { isDown = false; };
 
     mount.addEventListener('pointerdown',  onPointerDown);
     mount.addEventListener('pointermove',  onPointerMove);
     mount.addEventListener('pointerup',    onPointerUp);
-    mount.addEventListener('pointerleave', () => { isDown = false; });
+    mount.addEventListener('pointerleave', onPointerLeave);
     mount.addEventListener('wheel', onWheel, { passive: true });
     window.addEventListener('resize', onResize);
 
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => syncSize());
+      ro.observe(mount);
+    }
+
+    syncSize();
     emitView();
 
     // ── Animation loop ────────────────────────────────────────────────────
@@ -232,6 +252,8 @@ export default function HotspotEditorViewer({
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
+
+      syncSize();
 
       // Smooth camera damping
       lon += (targetLon - lon) * 0.08;
@@ -275,9 +297,10 @@ export default function HotspotEditorViewer({
       mount.removeEventListener('pointerdown',  onPointerDown);
       mount.removeEventListener('pointermove',  onPointerMove);
       mount.removeEventListener('pointerup',    onPointerUp);
-      mount.removeEventListener('pointerleave', () => { isDown = false; });
+      mount.removeEventListener('pointerleave', onPointerLeave);
       mount.removeEventListener('wheel', onWheel);
       window.removeEventListener('resize', onResize);
+      ro?.disconnect();
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };
