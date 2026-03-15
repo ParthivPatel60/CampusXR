@@ -95,7 +95,7 @@ export default function OverviewTab({ departments, roomsByDept }) {
       if (!roomId) { appendLog(`⚠️  Room not found: "${entry.room}" in "${entry.dept}"`); errors++; continue; }
 
       let existing = [];
-      try { existing = await getHotspots(deptId, roomId); } catch (_) {}
+      try { existing = await getHotspots(deptId, roomId); } catch { /* best-effort: skip if read fails */ }
       const existingLabels = new Set(existing.map(h => h.label));
 
       for (const hs of entry.hotspots) {

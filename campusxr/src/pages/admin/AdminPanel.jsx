@@ -36,7 +36,21 @@ export default function AdminPanel() {
     }
   }, []);
 
-  useEffect(() => { refreshAll(); }, [refreshAll]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const depts = await getDepartments();
+        if (cancelled) return;
+        setDepartments(depts);
+        const entries = await Promise.all(depts.map(async d => [d.id, await getRooms(d.id)]));
+        if (!cancelled) setRoomsByDept(Object.fromEntries(entries));
+      } catch (e) {
+        if (!cancelled) toast.error(`Failed to load data: ${e.message}`);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const activeNav = NAV.find(n => n.id === activeTab);
 
@@ -63,22 +77,25 @@ export default function AdminPanel() {
           <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
             Navigation
           </p>
-          {NAV.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                activeTab === id
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <Icon size={15} className="shrink-0" />
-              <span className="flex-1 text-left">{label}</span>
-              {activeTab === id && <ChevronRight size={12} className="opacity-60" />}
-            </button>
-          ))}
+          {NAV.map((item) => {
+            const NavIcon = item.Icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                  activeTab === item.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )}
+              >
+                <NavIcon size={15} className="shrink-0" />
+                <span className="flex-1 text-left">{item.label}</span>
+                {activeTab === item.id && <ChevronRight size={12} className="opacity-60" />}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Footer actions */}
