@@ -47,7 +47,7 @@ const CACHE_PATH    = path.join(__dirname, 'room-url-cache.json');
 const DRY_RUN = process.argv.includes('--dry-run');
 
 // ── Pre-flight checks ─────────────────────────────────────────────────────────
-if (!fs.existsSync(SA_PATH)) {
+if (!DRY_RUN && !fs.existsSync(SA_PATH)) {
   console.error([
     '',
     '❌  serviceAccount.json not found.',
@@ -74,19 +74,25 @@ if (!fs.existsSync(MANIFEST_PATH)) {
 }
 
 // ── Lazy-load heavy deps (only after pre-flight passes) ───────────────────────
-const admin      = require('firebase-admin');
-const cloudinary = require('cloudinary').v2;
+let admin = null;
+let cloudinary = null;
+let db = null;
 
 // ── Cloudinary config (unsigned upload — no API secret needed) ────────────────
 const CLOUD_NAME    = 'dsdll4n92';
 const UPLOAD_PRESET = 'campusxr_unsigned';
-cloudinary.config({ cloud_name: CLOUD_NAME });
 
-// ── Firebase Admin init ───────────────────────────────────────────────────────
-admin.initializeApp({
-  credential: admin.credential.cert(require(SA_PATH)),
-});
-const db = admin.firestore();
+if (!DRY_RUN) {
+  admin = require('firebase-admin');
+  cloudinary = require('cloudinary').v2;
+  cloudinary.config({ cloud_name: CLOUD_NAME });
+
+  // ── Firebase Admin init ─────────────────────────────────────────────────────
+  admin.initializeApp({
+    credential: admin.credential.cert(require(SA_PATH)),
+  });
+  db = admin.firestore();
+}
 
 // ── Cloudinary URL cache ──────────────────────────────────────────────────────
 let urlCache = {};

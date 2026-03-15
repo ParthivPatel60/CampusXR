@@ -30,6 +30,7 @@ import PanoramaViewer from '../components/viewer/PanoramaViewer';
 import { GLASS_BG as G_BG, GLASS_SHADOW as G_SHADOW, GLASS_BLUR as G_BLUR, PILL_STYLE, PILL_ACTIVE_STYLE } from '../constants/glassTokens';
 import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
 import { getCloudinaryThumb } from '../services/cloudinaryService';
+import { getFirebaseStartupValidationMessage } from '../config/runtimeValidation';
 
 gsap.registerPlugin(useGSAP);
 
@@ -284,6 +285,14 @@ export default function UserTourPage() {
   const loadCampusData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
+
+    const startupValidationMessage = getFirebaseStartupValidationMessage();
+    if (startupValidationMessage) {
+      setLoadError(startupValidationMessage);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const depts = await withTimeout(
         getDepartments(),
