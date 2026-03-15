@@ -126,7 +126,17 @@ export default function NavbarGlass({
       <div
         id="navbar-logo-badge"
         className="pointer-events-auto"
-        style={{ display: 'flex', alignItems: 'center' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '8px 10px',
+          borderRadius: '18px',
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.26) 0%, rgba(210,224,244,0.18) 100%)',
+          backdropFilter: 'blur(18px) saturate(130%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+          border: '1px solid rgba(255,255,255,0.42)',
+          boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34), 0 0 0 1px rgba(15,23,42,0.18)',
+        }}
       >
         <img
           src={logoSrc}

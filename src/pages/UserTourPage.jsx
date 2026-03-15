@@ -506,7 +506,7 @@ export default function UserTourPage() {
       {/* ═══ TOP-LEFT: Dept filter + search ═══════════════════════════════ */}
       <div ref={topLeftRef} style={{
         position: 'absolute',
-        top: '72px',
+        top: '98px',
         left: '20px',       /* aligned with SideControls left edge */
         zIndex: 40,
         display: 'flex',
