@@ -49,6 +49,7 @@ export default function AdminPanel() {
   const [hsSaving, setHsSaving] = useState(false);
   const [editorView, setEditorView] = useState({ yaw: 0, pitch: 0, fov: 75 });
   const [viewSaving, setViewSaving] = useState(false);
+  const [editorSidebarOpen, setEditorSidebarOpen] = useState(false);
 
   // Inline dept editing
   const [editingDeptId, setEditingDeptId] = useState(null);
@@ -199,6 +200,7 @@ export default function AdminPanel() {
   // ── Hotspot editor ────────────────────────────────────────────────────────
   const handleOpenEditor = (room) => {
     setEditingRoom({ room, deptId: selectedRoomsDeptId });
+    setEditorSidebarOpen(false);
     setEditorView({
       yaw: Number.isFinite(room?.defaultView?.yaw) ? room.defaultView.yaw : 0,
       pitch: Number.isFinite(room?.defaultView?.pitch) ? room.defaultView.pitch : 0,
@@ -254,6 +256,7 @@ export default function AdminPanel() {
 
   const handlePlaceHotspot = ({ pitch, yaw }) => {
     setPendingPos({ pitch, yaw });
+    setEditorSidebarOpen(true);
     setNewHsText(''); setNewHsDesc(''); setNewHsType('info');
     setNewHsTargetDeptId(''); setNewHsTargetRoomId('');
   };
@@ -642,10 +645,41 @@ export default function AdminPanel() {
               <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(0,0,0,0.65)', color: '#94a3b8', padding: '4px 12px', borderRadius: 6, fontSize: 12, pointerEvents: 'none', zIndex: 20 }}>
                 {(hotspotsByRoom[editingRoom.room.id] || []).length} hotspot{(hotspotsByRoom[editingRoom.room.id] || []).length !== 1 ? 's' : ''} · drag to pan · click to place
               </div>
+
+              <button
+                onClick={() => setEditorSidebarOpen(v => !v)}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 25,
+                  background: 'rgba(15,23,42,0.86)',
+                  border: '1px solid rgba(148,163,184,0.35)',
+                  color: '#e2e8f0',
+                  borderRadius: 10,
+                  padding: '7px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+                title={editorSidebarOpen ? 'Hide editor panel' : 'Show editor panel'}
+              >
+                {editorSidebarOpen ? 'Hide Panel' : `Show Panel (${(hotspotsByRoom[editingRoom.room.id] || []).length})`}
+              </button>
             </div>
 
             {/* Sidebar */}
-            <div style={{ width: 300, background: '#0f172a', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{
+              width: editorSidebarOpen ? 'clamp(290px, 24vw, 360px)' : 0,
+              background: '#0f172a',
+              borderLeft: editorSidebarOpen ? '1px solid #1e293b' : 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              opacity: editorSidebarOpen ? 1 : 0,
+              pointerEvents: editorSidebarOpen ? 'auto' : 'none',
+              transition: 'width 0.24s ease, opacity 0.2s ease',
+            }}>
               {pendingPos ? (
                 <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
                   <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 10, border: '1px solid #334155', background: '#111827' }}>
