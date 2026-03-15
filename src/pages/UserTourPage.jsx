@@ -105,9 +105,9 @@ export default function UserTourPage() {
   const initialRoomIdRef = useRef(new URLSearchParams(window.location.search).get('room'));
 
   /* ── Three.js camera handlers ────────────────────────────────────────────── */
-  /* ZoomIn/ZoomOut swapped per UX feedback — + widens view, - narrows view */
-  const handleZoomIn  = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.min(100, c.fov + 10); c.updateProjectionMatrix(); };
-  const handleZoomOut = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.max(30,  c.fov - 10); c.updateProjectionMatrix(); };
+  /* Zoom controls: + narrows FOV (zoom in), - widens FOV (zoom out) */
+  const handleZoomIn  = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.max(30,  c.fov - 10); c.updateProjectionMatrix(); };
+  const handleZoomOut = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.min(100, c.fov + 10); c.updateProjectionMatrix(); };
   /* Reset: restores camera orientation AND field-of-view to defaults */
   const handleRefresh   = () => { viewerRef.current?.reset?.(); };
   /* Pan: nudge the look-at direction by a fixed step */
