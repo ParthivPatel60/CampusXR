@@ -88,6 +88,7 @@ export default function UserTourPage() {
   const [loadError, setLoadError] = useState(null);
   const [visitHistory, setVisitHistory] = useState([]); // [current, prev, …] max 5
   const [copiedLink, setCopiedLink] = useState(false);
+  const [pendingNavTarget, setPendingNavTarget] = useState(null); // { deptId, roomId, label }
 
   /* ── Refs ────────────────────────────────────────────────────────────────── */
   const bottomNavRef = useRef(null);
@@ -105,6 +106,25 @@ export default function UserTourPage() {
   const urlAppliedRef  = useRef(false); // true once URL params have been consumed
   const initialDeptIdRef = useRef(new URLSearchParams(window.location.search).get('dept'));
   const initialRoomIdRef = useRef(new URLSearchParams(window.location.search).get('room'));
+  const pendingNavTargetRef = useRef(pendingNavTarget);
+
+  const normalizeName = useCallback((value) =>
+    String(value || '').trim().toLowerCase().replace(/\s+/g, ' '),
+  []);
+
+  const findTargetRoom = useCallback((roomList, roomId, label) => {
+    const normalizedLabel = normalizeName(label);
+    return roomList.find((rm) => {
+      if (rm.id === roomId) return true;
+      if (rm.roomKey && rm.roomKey === roomId) return true;
+      if (normalizedLabel && normalizeName(rm.name) === normalizedLabel) return true;
+      return false;
+    });
+  }, [normalizeName]);
+
+  useEffect(() => {
+    pendingNavTargetRef.current = pendingNavTarget;
+  }, [pendingNavTarget]);
 
   /* ── Three.js camera handlers ────────────────────────────────────────────── */
   /* Zoom controls: + narrows FOV (zoom in), - widens FOV (zoom out) */
@@ -169,11 +189,18 @@ export default function UserTourPage() {
   /* ── Room visit history — track last 5 unique rooms for back-navigation ──── */
   useEffect(() => {
     if (!activeRoom?.id) return;
+    const resolvedDeptId = activeRoom.deptId ?? activeDeptId ?? null;
+    const resolvedDeptName = activeRoom.deptName
+      ?? departments.find(d => d.id === resolvedDeptId)?.name
+      ?? activeDept;
+    const roomForHistory = resolvedDeptId
+      ? { ...activeRoom, deptId: resolvedDeptId, deptName: resolvedDeptName }
+      : activeRoom;
     setVisitHistory(prev => {
-      if (prev[0]?.id === activeRoom.id) return prev;
-      return [activeRoom, ...prev.filter(r => r.id !== activeRoom.id)].slice(0, 5);
+      if (prev[0]?.id === roomForHistory.id) return prev;
+      return [roomForHistory, ...prev.filter(r => r.id !== roomForHistory.id)].slice(0, 5);
     });
-  }, [activeRoom]);
+  }, [activeRoom, activeDeptId, activeDept, departments]);
 
   /* ── Close dept dropdown on outside click ──────────────────────────────── */
   useEffect(() => {
@@ -396,18 +423,29 @@ export default function UserTourPage() {
       return;
     }
     getRooms(activeDeptId).then((r) => {
-      setRooms(r);
+      const deptName = departments.find(d => d.id === activeDeptId)?.name;
+      const enriched = r.map(rm => ({ ...rm, deptId: activeDeptId, deptName: deptName ?? rm.deptName }));
+      setRooms(enriched);
+      const pending = pendingNavTargetRef.current;
+      if (pending?.deptId === activeDeptId && pending?.roomId) {
+        const target = findTargetRoom(enriched, pending.roomId, pending.label);
+        if (target) {
+          setActiveRoom(target);
+          setPendingNavTarget(null);
+          return;
+        }
+      }
       if (!urlAppliedRef.current && initialRoomIdRef.current) {
-        const target = r.find(rm => rm.id === initialRoomIdRef.current);
+        const target = enriched.find(rm => rm.id === initialRoomIdRef.current);
         if (target) { setActiveRoom(target); urlAppliedRef.current = true; return; }
       }
-      setActiveRoom(r.length > 0 ? r[0] : null);
+      setActiveRoom(enriched.length > 0 ? enriched[0] : null);
     });
-  }, [activeDeptId, departments]);
+  }, [activeDeptId, departments, findTargetRoom]);
 
   useEffect(() => {
     let cancelled = false;
-    const deptId = activeDeptId ?? activeRoom?.deptId;
+    const deptId = activeRoom?.deptId ?? activeDeptId;
     if (!activeRoom?.id || !deptId) {
       Promise.resolve().then(() => {
         if (!cancelled) setHotspots([]);
@@ -446,17 +484,29 @@ export default function UserTourPage() {
     if (hs.type === 'info') { setActiveHotspot(hs); setShowInfoPanel(true); }
     else if (hs.type === 'navigation' && hs.targetRoomId) {
       if (hs.targetDeptId && hs.targetDeptId !== activeDeptId) {
+        setPendingNavTarget({ deptId: hs.targetDeptId, roomId: hs.targetRoomId, label: hs.text });
         const targetDept = departments.find(d => d.id === hs.targetDeptId);
         if (targetDept) { setActiveDept(targetDept.name); setActiveDeptId(hs.targetDeptId); }
       } else {
-        const target = rooms.find(r => r.id === hs.targetRoomId);
+        const target = findTargetRoom(rooms, hs.targetRoomId, hs.text);
         if (target) setActiveRoom(target);
       }
     }
   };
   const handleNavClick = (label) => { setActiveNav(label); };
   const handleAdminClick = useCallback(() => { navigate('/admin'); }, [navigate]);
+  const syncRoomContext = useCallback((room) => {
+    if (!room) return;
+    if (room.deptId && room.deptId !== activeDeptId) {
+      const targetDept = departments.find(d => d.id === room.deptId);
+      if (targetDept) setActiveDept(targetDept.name);
+      setActiveDeptId(room.deptId);
+    }
+    setActiveRoom(room);
+  }, [activeDeptId, departments]);
+
   const handleDeptChange = (deptName) => {
+    setPendingNavTarget(null);
     setActiveDept(deptName);
     if (deptName === 'All Departments') {
       setActiveDeptId(null);
@@ -465,7 +515,7 @@ export default function UserTourPage() {
     const dept = departments.find(d => d.name === deptName);
     if (dept) setActiveDeptId(dept.id);
   };
-  const handleRoomSelect = (room) => { setActiveRoom(room); setShowRoomList(false); };
+  const handleRoomSelect = (room) => { syncRoomContext(room); setShowRoomList(false); };
 
   /* ── Tour Guide handlers ─────────────────────────────────────────────────── */
   const handleTourNext = () => {
@@ -1062,7 +1112,7 @@ export default function UserTourPage() {
           {/* ← Back to previous room */}
           {visitHistory.length > 1 && (
             <button
-              onClick={() => setActiveRoom(visitHistory[1])}
+              onClick={() => syncRoomContext(visitHistory[1])}
               title={`Back to ${visitHistory[1].name}`}
               style={{
                 background: 'rgba(255,255,255,0.08)',
