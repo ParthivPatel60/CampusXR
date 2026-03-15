@@ -83,6 +83,7 @@ export default function UserTourPage() {
   const [activeHotspot, setActiveHotspot] = useState(null);
   const [showRoomList, setShowRoomList] = useState(true);
   const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false);
+  const [tourGuideBottomPx, setTourGuideBottomPx] = useState(20);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [visitHistory, setVisitHistory] = useState([]); // [current, prev, …] max 5
@@ -228,6 +229,61 @@ export default function UserTourPage() {
       gsap.to(roomListRef.current, { height: 0, opacity: 0, duration: 0.25, ease: 'power3.in' });
     }
   }, [showRoomList]);
+
+  /* ── Layout: avoid Tour Guide colliding with large bottom panel ─────────── */
+  useEffect(() => {
+    const BASE_BOTTOM = 20;
+    const GAP = 10;
+    let rafId = null;
+
+    const recompute = () => {
+      const bottomEl = bottomNavRef.current;
+      const guideEl = tourGuideRef.current;
+      if (!guideEl || !bottomEl) {
+        setTourGuideBottomPx(BASE_BOTTOM);
+        return;
+      }
+
+      const bottomRect = bottomEl.getBoundingClientRect();
+      const guideW = guideEl.offsetWidth || 0;
+      const viewW = window.innerWidth;
+      const viewH = window.innerHeight;
+
+      // Guide is anchored at right: 20px. If there is no horizontal overlap,
+      // keep base position; otherwise lift above the bottom panel.
+      const guideLeftAtBase = viewW - BASE_BOTTOM - guideW;
+      const hasHorizontalOverlap = bottomRect.right > guideLeftAtBase;
+
+      let nextBottom = BASE_BOTTOM;
+      if (hasHorizontalOverlap) {
+        const liftToPanelTop = Math.max(BASE_BOTTOM, viewH - bottomRect.top + GAP);
+        nextBottom = liftToPanelTop;
+      }
+
+      setTourGuideBottomPx(prev => (Math.abs(prev - nextBottom) > 1 ? nextBottom : prev));
+    };
+
+    const schedule = () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(recompute);
+    };
+
+    schedule();
+    window.addEventListener('resize', schedule);
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(schedule);
+      if (bottomNavRef.current) ro.observe(bottomNavRef.current);
+      if (tourGuideRef.current) ro.observe(tourGuideRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', schedule);
+      if (rafId != null) cancelAnimationFrame(rafId);
+      ro?.disconnect();
+    };
+  }, [showRoomList, isBottomNavCollapsed, activeRoom?.id, tourOpen, isTourPlaying]);
 
   /* ── 3DGS immersive mode — GSAP: hide/show UI, fade iframe overlay ─────────── */
   useEffect(() => {
@@ -836,31 +892,33 @@ export default function UserTourPage() {
           alignItems: 'center',
           width: '100%',
         }}>
-        <button
-          onClick={() => setIsBottomNavCollapsed(true)}
-          title="Collapse bottom panel"
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '10px',
-            width: '24px',
-            height: '24px',
-            borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.22)',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.72)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            outline: 'none',
-            zIndex: 2,
-          }}
-        >
-          <span style={{ display: 'inline-flex', lineHeight: 0 }}>
-            <ChevronDown />
-          </span>
-        </button>
+        {showRoomList && (
+          <button
+            onClick={() => setIsBottomNavCollapsed(true)}
+            title="Collapse bottom panel"
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '10px',
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              border: '1px solid rgba(255,255,255,0.22)',
+              background: 'rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.72)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              outline: 'none',
+              zIndex: 2,
+            }}
+          >
+            <span style={{ display: 'inline-flex', lineHeight: 0 }}>
+              <ChevronDown />
+            </span>
+          </button>
+        )}
         {/* Room thumbnail cards — GSAP-animated slide wrapper */}
         <div ref={roomListRef} style={{ overflow: 'hidden' }}>
           <div
@@ -1088,6 +1146,34 @@ export default function UserTourPage() {
             {activeRoom?.name}
           </span>
 
+          {/* Collapse control (inline when thumbnail list is hidden to avoid overlap) */}
+          {!showRoomList && (
+            <button
+              onClick={() => setIsBottomNavCollapsed(true)}
+              title="Collapse bottom panel"
+              style={{
+                marginLeft: '2px',
+                flexShrink: 0,
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.22)',
+                color: 'rgba(255,255,255,0.65)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                outline: 'none',
+                transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease',
+              }}
+            >
+              <span style={{ display: 'inline-flex', lineHeight: 0 }}>
+                <ChevronDown />
+              </span>
+            </button>
+          )}
+
           {/* Share / copy-link button */}
           <button
             onClick={() => {
@@ -1132,7 +1218,7 @@ export default function UserTourPage() {
       {/* ═══ BOTTOM-RIGHT: Merged Tour Guide Panel ══════════════════════ */}
       <div ref={tourGuideRef} style={{
         position: 'absolute',
-        bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', // safe area for iPhone home bar
+        bottom: `calc(${tourGuideBottomPx}px + env(safe-area-inset-bottom, 0px))`, // dynamic collision-safe offset
         right: '20px',
         zIndex: 40,
         display: 'flex',
