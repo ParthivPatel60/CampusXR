@@ -23,6 +23,13 @@ const TYPE_STYLES = {
     navigation: { ring: '#34D399', dot: '#10B981', glow: 'rgba(52,211,153,0.60)', icon: '›' },
 };
 
+// Street-view arrow vertical placement tuning.
+// Increase ARROW_Y_OFFSET_PX or ARROW_MAX_Y_RATIO to push arrows lower.
+const ARROW_MIN_Y_RATIO = 0.70;
+const ARROW_MAX_Y_RATIO = 0.95;
+const ARROW_Y_OFFSET_PX = 26;
+const ARROW_PANEL_GAP_PX = 6;
+
 /** Build a single hotspot marker DOM element matching HotspotMarker.jsx visuals. */
 function buildMarkerEl(hs, onClickCb) {
     const c = TYPE_STYLES[hs.type] ?? TYPE_STYLES.navigation;
@@ -522,8 +529,8 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
 
                     // Arrow screen-X tracks the hotspot; Y is clamped near the lower area,
                     // but never allowed to overlap the bottom navigation panel.
-                    const minArrowY = h2 * 0.62;
-                    let maxArrowY = h2 * 0.88;
+                    const minArrowY = h2 * ARROW_MIN_Y_RATIO;
+                    let maxArrowY = h2 * ARROW_MAX_Y_RATIO;
                     const bottomPanel = document.getElementById('bottom-nav-panel');
                     if (bottomPanel) {
                         const panelRect = bottomPanel.getBoundingClientRect();
@@ -531,11 +538,12 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                         const panelTopInViewer = panelRect.top - mountRect.top;
                         if (Number.isFinite(panelTopInViewer)) {
                             // Keep a small visual gap above the panel.
-                            maxArrowY = Math.min(maxArrowY, panelTopInViewer - 14);
+                            maxArrowY = Math.min(maxArrowY, panelTopInViewer - ARROW_PANEL_GAP_PX);
                         }
                     }
                     if (maxArrowY < minArrowY) maxArrowY = minArrowY;
-                    const clampedY = Math.max(minArrowY, Math.min(maxArrowY, sy));
+                    const desiredY = sy + ARROW_Y_OFFSET_PX;
+                    const clampedY = Math.max(minArrowY, Math.min(maxArrowY, desiredY));
 
                     // Screen-space rotation: arrow X is always forced to hotspot X (sx),
                     // so only the vertical delta matters for the rotation angle.
