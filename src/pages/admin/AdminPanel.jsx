@@ -11,6 +11,7 @@ import {
   deleteDepartment,
   getRooms,
   addRoom,
+  updateRoom,
   deleteRoom,
   getHotspots,
   addHotspot,
@@ -46,6 +47,8 @@ export default function AdminPanel() {
   const [newHsTargetDeptId, setNewHsTargetDeptId] = useState('');
   const [newHsTargetRoomId, setNewHsTargetRoomId] = useState('');
   const [hsSaving, setHsSaving] = useState(false);
+  const [editorView, setEditorView] = useState({ yaw: 0, pitch: 0, fov: 75 });
+  const [viewSaving, setViewSaving] = useState(false);
 
   // Inline dept editing
   const [editingDeptId, setEditingDeptId] = useState(null);
@@ -196,9 +199,57 @@ export default function AdminPanel() {
   // ── Hotspot editor ────────────────────────────────────────────────────────
   const handleOpenEditor = (room) => {
     setEditingRoom({ room, deptId: selectedRoomsDeptId });
+    setEditorView({
+      yaw: Number.isFinite(room?.defaultView?.yaw) ? room.defaultView.yaw : 0,
+      pitch: Number.isFinite(room?.defaultView?.pitch) ? room.defaultView.pitch : 0,
+      fov: Number.isFinite(room?.defaultView?.fov) ? room.defaultView.fov : 75,
+    });
     setPendingPos(null);
     setNewHsText(''); setNewHsDesc(''); setNewHsType('info');
     setNewHsTargetDeptId(''); setNewHsTargetRoomId('');
+  };
+
+  const handleSaveDefaultView = async () => {
+    if (!editingRoom) return;
+    setViewSaving(true);
+    try {
+      const payload = {
+        yaw: Math.round((editorView?.yaw ?? 0) * 10) / 10,
+        pitch: Math.round((editorView?.pitch ?? 0) * 10) / 10,
+        fov: Math.round((editorView?.fov ?? 75) * 10) / 10,
+      };
+      await updateRoom(editingRoom.deptId, editingRoom.room.id, { defaultView: payload });
+
+      setRoomsByDept(prev => ({
+        ...prev,
+        [editingRoom.deptId]: (prev[editingRoom.deptId] || []).map(r => (
+          r.id === editingRoom.room.id ? { ...r, defaultView: payload } : r
+        )),
+      }));
+      setEditingRoom(prev => prev ? { ...prev, room: { ...prev.room, defaultView: payload } } : prev);
+    } finally {
+      setViewSaving(false);
+    }
+  };
+
+  const handleResetDefaultView = async () => {
+    if (!editingRoom) return;
+    setViewSaving(true);
+    try {
+      const payload = { yaw: 0, pitch: 0, fov: 75 };
+      await updateRoom(editingRoom.deptId, editingRoom.room.id, { defaultView: payload });
+      setEditorView(payload);
+
+      setRoomsByDept(prev => ({
+        ...prev,
+        [editingRoom.deptId]: (prev[editingRoom.deptId] || []).map(r => (
+          r.id === editingRoom.room.id ? { ...r, defaultView: payload } : r
+        )),
+      }));
+      setEditingRoom(prev => prev ? { ...prev, room: { ...prev.room, defaultView: payload } } : prev);
+    } finally {
+      setViewSaving(false);
+    }
   };
 
   const handlePlaceHotspot = ({ pitch, yaw }) => {
@@ -582,6 +633,8 @@ export default function AdminPanel() {
                   pendingPos={pendingPos}
                   onPlaceHotspot={handlePlaceHotspot}
                   onDeleteHotspot={handleDeleteHotspot}
+                  initialView={editingRoom.room.defaultView}
+                  onViewChange={setEditorView}
                 />
               ) : (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: 15 }}>No panorama image</div>
@@ -595,6 +648,49 @@ export default function AdminPanel() {
             <div style={{ width: 300, background: '#0f172a', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {pendingPos ? (
                 <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                  <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 10, border: '1px solid #334155', background: '#111827' }}>
+                    <p style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700, margin: '0 0 8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      Default Start View
+                    </p>
+                    <p style={{ color: '#94a3b8', fontSize: 12, margin: '0 0 10px' }}>
+                      Current view: yaw {Math.round((editorView?.yaw ?? 0) * 10) / 10}° · pitch {Math.round((editorView?.pitch ?? 0) * 10) / 10}° · fov {Math.round((editorView?.fov ?? 75) * 10) / 10}°
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={handleSaveDefaultView}
+                        disabled={viewSaving}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          borderRadius: 8,
+                          border: 'none',
+                          cursor: viewSaving ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background: viewSaving ? '#1e293b' : '#1d4ed8',
+                          color: viewSaving ? '#64748b' : '#fff',
+                        }}
+                      >
+                        {viewSaving ? 'Saving…' : 'Set Current as Default'}
+                      </button>
+                      <button
+                        onClick={handleResetDefaultView}
+                        disabled={viewSaving}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          border: '1px solid #334155',
+                          cursor: viewSaving ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                          background: '#1e293b',
+                          color: '#cbd5e1',
+                        }}
+                      >
+                        Center
+                      </button>
+                    </div>
+                  </div>
+
                   <h3 style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>New Hotspot</h3>
                   <p style={{ color: '#475569', fontSize: 12, margin: '0 0 20px' }}>Yaw: {pendingPos.yaw}° · Pitch: {pendingPos.pitch}°</p>
 
@@ -673,6 +769,49 @@ export default function AdminPanel() {
                 </div>
               ) : (
                 <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                  <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 10, border: '1px solid #334155', background: '#111827' }}>
+                    <p style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700, margin: '0 0 8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      Default Start View
+                    </p>
+                    <p style={{ color: '#94a3b8', fontSize: 12, margin: '0 0 10px' }}>
+                      Current view: yaw {Math.round((editorView?.yaw ?? 0) * 10) / 10}° · pitch {Math.round((editorView?.pitch ?? 0) * 10) / 10}° · fov {Math.round((editorView?.fov ?? 75) * 10) / 10}°
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={handleSaveDefaultView}
+                        disabled={viewSaving}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          borderRadius: 8,
+                          border: 'none',
+                          cursor: viewSaving ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background: viewSaving ? '#1e293b' : '#1d4ed8',
+                          color: viewSaving ? '#64748b' : '#fff',
+                        }}
+                      >
+                        {viewSaving ? 'Saving…' : 'Set Current as Default'}
+                      </button>
+                      <button
+                        onClick={handleResetDefaultView}
+                        disabled={viewSaving}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          border: '1px solid #334155',
+                          cursor: viewSaving ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                          background: '#1e293b',
+                          color: '#cbd5e1',
+                        }}
+                      >
+                        Center
+                      </button>
+                    </div>
+                  </div>
+
                   <h3 style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700, margin: '0 0 16px' }}>
                     Hotspots ({(hotspotsByRoom[editingRoom.room.id] || []).length})
                   </h3>

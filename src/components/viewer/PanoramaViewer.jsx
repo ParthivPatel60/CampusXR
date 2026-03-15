@@ -257,7 +257,7 @@ function buildArrowEl(hs, onClickCb) {
     return wrapper;
 }
 
-export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady }) {
+export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick, onReady, initialView }) {
     const mountRef = useRef(null);
     const markersContainerRef = useRef(null);
     const arrowsAnchorRef = useRef(null);
@@ -341,10 +341,18 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         scene.add(sphere);
 
         // ── Drag-to-look controls ─────────────────────────────────────────────────
+        const clampPitch = (v) => Math.max(-85, Math.min(85, v));
+        const clampFov = (v) => Math.max(30, Math.min(100, v));
+        const defaultYaw = Number.isFinite(initialView?.yaw) ? initialView.yaw : 0;
+        const defaultPitch = Number.isFinite(initialView?.pitch) ? clampPitch(initialView.pitch) : 0;
+        const defaultFov = Number.isFinite(initialView?.fov) ? clampFov(initialView.fov) : 75;
+
         let isPointerDown = false;
         let prevX = 0, prevY = 0;
-        let lon = 0, lat = 0;
-        let targetLon = 0, targetLat = 0;
+        let lon = defaultYaw, lat = defaultPitch;
+        let targetLon = defaultYaw, targetLat = defaultPitch;
+        camera.fov = defaultFov;
+        camera.updateProjectionMatrix();
 
         const onPointerDown = (e) => {
             isPointerDown = true;
@@ -512,8 +520,22 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                         continue;
                     }
 
-                    // Arrow screen-X tracks the hotspot; Y is clamped to lower 30% of screen
-                    const clampedY = Math.max(h2 * 0.62, Math.min(h2 * 0.88, sy));
+                    // Arrow screen-X tracks the hotspot; Y is clamped near the lower area,
+                    // but never allowed to overlap the bottom navigation panel.
+                    const minArrowY = h2 * 0.62;
+                    let maxArrowY = h2 * 0.88;
+                    const bottomPanel = document.getElementById('bottom-nav-panel');
+                    if (bottomPanel) {
+                        const panelRect = bottomPanel.getBoundingClientRect();
+                        const mountRect = mount.getBoundingClientRect();
+                        const panelTopInViewer = panelRect.top - mountRect.top;
+                        if (Number.isFinite(panelTopInViewer)) {
+                            // Keep a small visual gap above the panel.
+                            maxArrowY = Math.min(maxArrowY, panelTopInViewer - 14);
+                        }
+                    }
+                    if (maxArrowY < minArrowY) maxArrowY = minArrowY;
+                    const clampedY = Math.max(minArrowY, Math.min(maxArrowY, sy));
 
                     // Screen-space rotation: arrow X is always forced to hotspot X (sx),
                     // so only the vertical delta matters for the rotation angle.
@@ -546,9 +568,11 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             renderer,
             scene,
             reset() {
-                lon = 0; lat = 0;
-                targetLon = 0; targetLat = 0;
-                camera.fov = 75;
+                lon = defaultYaw;
+                lat = defaultPitch;
+                targetLon = defaultYaw;
+                targetLat = defaultPitch;
+                camera.fov = defaultFov;
                 camera.updateProjectionMatrix();
             },
             panBy(dLon, dLat) {
@@ -574,7 +598,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             renderer.dispose();
             if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
         };
-    }, [imageURL]); // re-initialise whenever the panorama image changes
+    }, [imageURL, initialView?.yaw, initialView?.pitch, initialView?.fov]); // re-initialise whenever room view defaults change
 
     return (
         <div

@@ -69,6 +69,8 @@ export default function HotspotEditorViewer({
   pendingPos,
   onPlaceHotspot,
   onDeleteHotspot,
+  initialView,
+  onViewChange,
 }) {
   const mountRef        = useRef(null);
   const overlayRef      = useRef(null);
@@ -77,11 +79,13 @@ export default function HotspotEditorViewer({
   const pendingPosRef   = useRef(pendingPos);
   const onPlaceRef      = useRef(onPlaceHotspot);
   const onDeleteRef     = useRef(onDeleteHotspot);
+  const onViewChangeRef = useRef(onViewChange);
 
   useEffect(() => { hotspotsRef.current   = hotspots; },        [hotspots]);
   useEffect(() => { pendingPosRef.current  = pendingPos; },      [pendingPos]);
   useEffect(() => { onPlaceRef.current     = onPlaceHotspot; },  [onPlaceHotspot]);
   useEffect(() => { onDeleteRef.current    = onDeleteHotspot; }, [onDeleteHotspot]);
+  useEffect(() => { onViewChangeRef.current = onViewChange; },   [onViewChange]);
 
   // ── Rebuild hotspot marker DOM elements whenever hotspots array changes ──
   useEffect(() => {
@@ -126,7 +130,28 @@ export default function HotspotEditorViewer({
 
     // ── Drag-to-look state ────────────────────────────────────────────────
     let isDown = false, prevX = 0, prevY = 0, dragDist = 0;
-    let lon = 0, lat = 0, targetLon = 0, targetLat = 0;
+    const clampPitch = (v) => Math.max(-85, Math.min(85, v));
+    const clampFov = (v) => Math.max(30, Math.min(100, v));
+    const initYaw = Number.isFinite(initialView?.yaw) ? initialView.yaw : 0;
+    const initPitch = Number.isFinite(initialView?.pitch) ? clampPitch(initialView.pitch) : 0;
+    const initFov = Number.isFinite(initialView?.fov) ? clampFov(initialView.fov) : 75;
+
+    let lon = initYaw, lat = initPitch, targetLon = initYaw, targetLat = initPitch;
+    camera.fov = initFov;
+    camera.updateProjectionMatrix();
+
+    let lastViewSig = '';
+    const emitView = () => {
+      const payload = {
+        yaw: Math.round(lon * 10) / 10,
+        pitch: Math.round(lat * 10) / 10,
+        fov: Math.round(camera.fov * 10) / 10,
+      };
+      const sig = `${payload.yaw}|${payload.pitch}|${payload.fov}`;
+      if (sig === lastViewSig) return;
+      lastViewSig = sig;
+      onViewChangeRef.current?.(payload);
+    };
 
     const raycaster = new THREE.Raycaster();
     const ndc       = new THREE.Vector2();
@@ -162,11 +187,13 @@ export default function HotspotEditorViewer({
           onPlaceRef.current?.(worldToPitchYaw(hits[0].point));
         }
       }
+      emitView();
     };
 
     const onWheel = (e) => {
       camera.fov = Math.max(30, Math.min(100, camera.fov + e.deltaY * 0.05));
       camera.updateProjectionMatrix();
+      emitView();
     };
     const onResize = () => {
       renderer.setSize(mount.clientWidth, mount.clientHeight);
@@ -180,6 +207,8 @@ export default function HotspotEditorViewer({
     mount.addEventListener('pointerleave', () => { isDown = false; });
     mount.addEventListener('wheel', onWheel, { passive: true });
     window.addEventListener('resize', onResize);
+
+    emitView();
 
     // ── Animation loop ────────────────────────────────────────────────────
     const _v = new THREE.Vector3();
@@ -252,7 +281,7 @@ export default function HotspotEditorViewer({
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };
-  }, [imageURL]);
+  }, [imageURL, initialView?.yaw, initialView?.pitch, initialView?.fov]);
 
   return (
     <div

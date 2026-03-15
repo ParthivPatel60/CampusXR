@@ -66,6 +66,13 @@ export const addRoom = async (deptId, roomData) => {
   return ref.id;
 };
 
+export const updateRoom = async (deptId, roomId, roomData) => {
+  await updateDoc(
+    doc(db, "departments", deptId, "rooms", roomId),
+    roomData
+  );
+};
+
 export const deleteRoom = async (deptId, roomId) => {
   const hotspotsSnap = await getDocs(
     collection(db, "departments", deptId, "rooms", roomId, "hotspots")

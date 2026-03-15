@@ -447,8 +447,9 @@ export default function UserTourPage() {
       <div ref={panoramaBgRef} className="absolute inset-0">
         {activeRoom?.imageURL ? (
           <PanoramaViewer
-            key={activeRoom.imageURL}
+            key={activeRoom.id || activeRoom.imageURL}
             imageURL={activeRoom.imageURL}
+            initialView={activeRoom.defaultView}
             hotspots={hotspots}
             onHotspotClick={handleHotspotClick}
             onReady={(viewer) => { viewerRef.current = viewer; }}
@@ -780,6 +781,7 @@ export default function UserTourPage() {
       {/* ═══ BOTTOM NAV — unified glass card: thumbnails + breadcrumb ══ */}
       <div
         ref={bottomNavRef}
+        id="bottom-nav-panel"
         style={{
           position: 'absolute',
           bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', // safe area for iPhone home bar
