@@ -50,8 +50,10 @@ export default function ViewerOverlay({
     onToggle3D,
     show3DToggle = false,
     onAdminClick,
+    roomTransitionKey,
 }) {
     const overlayRef = useRef(null);
+    const isFirstRun = useRef(true);
 
     useGSAP(() => {
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -59,17 +61,23 @@ export default function ViewerOverlay({
         const controls = overlayRef.current?.querySelector('[data-anim="overlay-controls"]');
         if (!navbar || !controls) return;
 
+        const firstRun = isFirstRun.current;
+        isFirstRun.current = false;
+
         if (prefersReducedMotion) {
-                        gsap.set([navbar, controls], { opacity: 1, clearProps: 'all' });
+            gsap.set([navbar, controls], { opacity: 1, clearProps: 'all' });
             return;
         }
 
-                gsap.set([navbar, controls], { opacity: 0, filter: 'blur(6px)' });
+        // On room transitions, delay slightly so the exit animation can finish first
+        const delay = firstRun ? 0 : 0.22;
+        gsap.killTweensOf([navbar, controls]);
+        gsap.set([navbar, controls], { opacity: 0, filter: 'blur(6px)' });
 
-                const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-                tl.to(navbar, { opacity: 1, filter: 'blur(0px)', duration: 0.4, clearProps: 'opacity,filter' })
-                    .to(controls, { opacity: 1, filter: 'blur(0px)', duration: 0.38, clearProps: 'opacity,filter' }, '-=0.2');
-    }, { scope: overlayRef });
+        const tl = gsap.timeline({ delay, defaults: { ease: 'power2.out' } });
+        tl.to(navbar, { opacity: 1, filter: 'blur(0px)', duration: 0.4, clearProps: 'opacity,filter' })
+          .to(controls, { opacity: 1, filter: 'blur(0px)', duration: 0.38, clearProps: 'opacity,filter' }, '-=0.2');
+    }, { scope: overlayRef, dependencies: [roomTransitionKey] });
 
     return (
         /* Full-viewport overlay — pointer-events:none so panorama stays interactive.

@@ -101,6 +101,8 @@ export default function UserTourPage() {
   const tourGuideRef  = useRef(null);  // bottom-right tour guide panel
   const panoramaBgRef  = useRef(null);  // panorama container — GSAP blur/scale target
   const roomListRef    = useRef(null);  // thumbnail tray  — GSAP slide target
+  const activeRoomRef  = useRef(null);  // always-fresh activeRoom for tour/transition handlers
+  const prevRoomKeyRef = useRef(null);  // tracks prev room key for entrance animation guard
   const idleTimerRef   = useRef(null);  // auto-rotate idle timer handle
   const autoRotateRef  = useRef(null);  // auto-rotate interval handle
   const urlAppliedRef  = useRef(false); // true once URL params have been consumed
@@ -126,6 +128,19 @@ export default function UserTourPage() {
     pendingNavTargetRef.current = pendingNavTarget;
   }, [pendingNavTarget]);
 
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  // Stable key for transitions even when room.id is missing in some records.
+  const roomTransitionKey = useMemo(() => (
+    activeRoom?.id
+    || activeRoom?.roomKey
+    || activeRoom?.imageURL
+    || activeRoom?.name
+    || null
+  ), [activeRoom]);
+
   /* ── Three.js camera handlers ────────────────────────────────────────────── */
   /* Zoom controls: + narrows FOV (zoom in), - widens FOV (zoom out) */
   const handleZoomIn  = () => { const c = viewerRef.current?.camera; if (!c) return; c.fov = Math.max(30,  c.fov - 10); c.updateProjectionMatrix(); };
@@ -137,6 +152,27 @@ export default function UserTourPage() {
   const handlePanDown  = () => { viewerRef.current?.panBy?.(0, -PAN_STEP); };
   const handlePanLeft  = () => { viewerRef.current?.panBy?.(-PAN_STEP, 0); };
   const handlePanRight = () => { viewerRef.current?.panBy?.( PAN_STEP, 0); };
+
+  /* ── Cinematic room transition ──────────────────────────────────────────────
+     Blurs/darkens the panorama on the way out, then fires onSwap when the
+     exit animation finishes. Uses a ref-stored tween so the showInfoPanel
+     useGSAP hook cannot kill it by calling killTweensOf(panoramaBgRef).
+  ──────────────────────────────────────────────────────────────────────────── */
+  const transitionTweenRef = useRef(null);
+  const transitionToRoom = useCallback((onSwap) => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) { onSwap(); return; }
+    // Kill any previous transition that is still running
+    transitionTweenRef.current?.kill();
+    transitionTweenRef.current = gsap.to(panoramaBgRef.current, {
+      filter: 'blur(10px) brightness(0.45)',
+      scale: 1.035,
+      duration: 0.3,
+      ease: 'power2.inOut',
+      overwrite: true,
+      onComplete: onSwap,
+    });
+  }, []);
 
   /* ── Keyboard navigation — Arrow keys pan; +/- zoom; R resets view ────────── */
   useEffect(() => {
@@ -232,17 +268,21 @@ export default function UserTourPage() {
   /* ── GSAP: panorama background blur + scale when info panel opens ────────── */
   useGSAP(() => {
     if (!panoramaBgRef.current) return;
-    gsap.killTweensOf(panoramaBgRef.current);
+    // Do NOT kill all tweens here — would cancel an in-progress room transition.
+    // Let overwrite:'auto' handle any conflict with the transition tween.
     if (showInfoPanel) {
       gsap.to(panoramaBgRef.current, {
         filter: 'blur(4px) brightness(0.75)', scale: 1.05,
-        duration: 0.5, ease: 'power2.out',
+        duration: 0.5, ease: 'power2.out', overwrite: 'auto',
       });
     } else {
-      gsap.to(panoramaBgRef.current, {
-        filter: 'blur(0px) brightness(1)', scale: 1,
-        duration: 0.5, ease: 'power2.out',
-      });
+      // Only restore if no transition tween is actively running
+      if (!transitionTweenRef.current?.isActive()) {
+        gsap.to(panoramaBgRef.current, {
+          filter: 'blur(0px) brightness(1)', scale: 1,
+          duration: 0.5, ease: 'power2.out', overwrite: 'auto',
+        });
+      }
     }
   }, [showInfoPanel]);
 
@@ -256,6 +296,24 @@ export default function UserTourPage() {
       gsap.to(roomListRef.current, { height: 0, opacity: 0, duration: 0.25, ease: 'power3.in' });
     }
   }, [showRoomList]);
+
+  /* ── Panorama entrance — restores blur/scale after cinematic exit ─────────── */
+  useEffect(() => {
+    const newKey = roomTransitionKey;
+    const prevKey = prevRoomKeyRef.current;
+    prevRoomKeyRef.current = newKey;
+    // Skip initial load (prevKey null) and same-room refreshes
+    if (!newKey || !prevKey || prevKey === newKey || !panoramaBgRef.current) return;
+    gsap.killTweensOf(panoramaBgRef.current);
+    gsap.to(panoramaBgRef.current, {
+      filter: 'blur(0px) brightness(1)',
+      scale: 1,
+      duration: 0.65,
+      delay: 0.12,
+      ease: 'power2.out',
+      overwrite: true,
+    });
+  }, [roomTransitionKey]);
 
   /* ── Layout: avoid Tour Guide colliding with large bottom panel ─────────── */
   useEffect(() => {
@@ -483,13 +541,25 @@ export default function UserTourPage() {
   const handleHotspotClick = (hs) => {
     if (hs.type === 'info') { setActiveHotspot(hs); setShowInfoPanel(true); }
     else if (hs.type === 'navigation' && hs.targetRoomId) {
+      // In All Departments mode, keep the filter broad and navigate in-place.
+      if (activeDeptId === null) {
+        const target = findTargetRoom(rooms, hs.targetRoomId, hs.text);
+        if (target) {
+          transitionToRoom(() => setActiveRoom(target));
+          return;
+        }
+      }
+
       if (hs.targetDeptId && hs.targetDeptId !== activeDeptId) {
-        setPendingNavTarget({ deptId: hs.targetDeptId, roomId: hs.targetRoomId, label: hs.text });
-        const targetDept = departments.find(d => d.id === hs.targetDeptId);
-        if (targetDept) { setActiveDept(targetDept.name); setActiveDeptId(hs.targetDeptId); }
+        transitionToRoom(() => {
+          setPendingNavTarget({ deptId: hs.targetDeptId, roomId: hs.targetRoomId, label: hs.text });
+          const targetDept = departments.find(d => d.id === hs.targetDeptId);
+          if (targetDept) setActiveDept(targetDept.name);
+          setActiveDeptId(hs.targetDeptId);
+        });
       } else {
         const target = findTargetRoom(rooms, hs.targetRoomId, hs.text);
-        if (target) setActiveRoom(target);
+        if (target) transitionToRoom(() => setActiveRoom(target));
       }
     }
   };
@@ -497,6 +567,11 @@ export default function UserTourPage() {
   const handleAdminClick = useCallback(() => { navigate('/admin'); }, [navigate]);
   const syncRoomContext = useCallback((room) => {
     if (!room) return;
+    // Preserve All Departments browsing behavior: don't auto-switch filters.
+    if (activeDeptId === null) {
+      setActiveRoom(room);
+      return;
+    }
     if (room.deptId && room.deptId !== activeDeptId) {
       const targetDept = departments.find(d => d.id === room.deptId);
       if (targetDept) setActiveDept(targetDept.name);
@@ -506,31 +581,33 @@ export default function UserTourPage() {
   }, [activeDeptId, departments]);
 
   const handleDeptChange = (deptName) => {
-    setPendingNavTarget(null);
-    setActiveDept(deptName);
-    if (deptName === 'All Departments') {
-      setActiveDeptId(null);
-      return;
-    }
-    const dept = departments.find(d => d.name === deptName);
-    if (dept) setActiveDeptId(dept.id);
+    transitionToRoom(() => {
+      setPendingNavTarget(null);
+      setActiveDept(deptName);
+      if (deptName === 'All Departments') {
+        setActiveDeptId(null);
+        return;
+      }
+      const dept = departments.find(d => d.name === deptName);
+      if (dept) setActiveDeptId(dept.id);
+    });
   };
-  const handleRoomSelect = (room) => { syncRoomContext(room); setShowRoomList(false); };
+  const handleRoomSelect = (room) => { transitionToRoom(() => { syncRoomContext(room); setShowRoomList(false); }); };
 
   /* ── Tour Guide handlers ─────────────────────────────────────────────────── */
   const handleTourNext = () => {
-    setActiveRoom(prev => {
-      if (!rooms.length) return prev;
-      const idx = rooms.findIndex(r => r.id === prev?.id);
-      return rooms[(idx + 1) % rooms.length];
-    });
+    const list = rooms;
+    if (!list.length) return;
+    const idx = list.findIndex(r => r.id === activeRoomRef.current?.id);
+    const nextRoom = list[(idx + 1) % list.length];
+    transitionToRoom(() => setActiveRoom(nextRoom));
   };
   const handleTourPrev = () => {
-    setActiveRoom(prev => {
-      if (!rooms.length) return prev;
-      const idx = rooms.findIndex(r => r.id === prev?.id);
-      return rooms[(idx - 1 + rooms.length) % rooms.length];
-    });
+    const list = rooms;
+    if (!list.length) return;
+    const idx = list.findIndex(r => r.id === activeRoomRef.current?.id);
+    const prevRoom = list[(idx - 1 + list.length) % list.length];
+    transitionToRoom(() => setActiveRoom(prevRoom));
   };
   const handleTourToggleBtn = () => {
     if (!tourOpen) { setTourOpen(true); setIsTourPlaying(true); }
@@ -596,6 +673,7 @@ export default function UserTourPage() {
         activeRoom={activeRoom}
         activeDept={activeDept}
         activeNav={activeNav}
+        roomTransitionKey={roomTransitionKey}
         onNavClick={handleNavClick}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
