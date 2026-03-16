@@ -20,6 +20,16 @@ import gsap from 'gsap';
 import logoSrc from '../../assets/logo.png';
 import { GLASS_SHADOW, GLASS_BLUR, PILL_ACTIVE_BG, PILL_ACTIVE_BORDER, PILL_IDLE_BG, PILL_IDLE_BORDER } from '../../constants/glassTokens';
 
+function runGlassShimmer(shimmerEl, { peak = 0.28, duration = 1.08 } = {}) {
+  if (!shimmerEl) return;
+  gsap.killTweensOf(shimmerEl);
+  gsap.set(shimmerEl, { xPercent: -165, opacity: 0 });
+  gsap.timeline({ defaults: { overwrite: true } })
+    .to(shimmerEl, { opacity: peak, duration: 0.14, ease: 'power1.out' })
+    .to(shimmerEl, { xPercent: 190, duration, ease: 'power2.inOut' }, 0)
+    .to(shimmerEl, { opacity: 0, duration: 0.22, ease: 'power1.in' }, '>-0.18');
+}
+
 function MagneticWrap({ children, strength = 8, rotate = 1.2 }) {
   const wrapRef = useRef(null);
   const magRef = useRef({ xTo: null, yTo: null, rTo: null });
@@ -171,12 +181,37 @@ export default function NavbarGlass({
   const betaBadgeRef = useRef(null);
   const pulseTlRef = useRef(null);
   const mountedRef = useRef(false);
+  const reducedMotionRef = useRef(false);
+  const idleSweepIndexRef = useRef(0);
+  const logoShimmerRef = useRef(null);
+  const toggleShimmerRef = useRef(null);
+  const adminShimmerRef = useRef(null);
+
+  useEffect(() => {
+    reducedMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotionRef.current) return;
+    const sweepTargets = [logoShimmerRef, toggleShimmerRef, adminShimmerRef];
+    const runIdleSweep = () => {
+      const idx = idleSweepIndexRef.current % sweepTargets.length;
+      idleSweepIndexRef.current += 1;
+      runGlassShimmer(sweepTargets[idx]?.current, { peak: 0.2, duration: 1.26 });
+    };
+
+    const firstSweepTimer = window.setTimeout(runIdleSweep, 1200);
+    const idleTimer = window.setInterval(runIdleSweep, 12000);
+    return () => {
+      window.clearTimeout(firstSweepTimer);
+      window.clearInterval(idleTimer);
+    };
+  }, [show3DToggle]);
 
   useEffect(() => {
     if (!show3DToggle || !toggleBtnRef.current) return;
 
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReducedMotion) return;
+    if (reducedMotionRef.current) return;
 
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -235,6 +270,10 @@ export default function NavbarGlass({
       );
 
     pulseTlRef.current = tl;
+    runGlassShimmer(toggleShimmerRef.current, {
+      peak: is3DMode ? 0.34 : 0.24,
+      duration: is3DMode ? 0.95 : 1.08,
+    });
   }, [is3DMode, show3DToggle]);
 
   return (
@@ -248,6 +287,9 @@ export default function NavbarGlass({
         id="navbar-logo-badge"
         className="pointer-events-auto"
         style={{
+          position: 'relative',
+          overflow: 'hidden',
+          isolation: 'isolate',
           display: 'flex',
           alignItems: 'center',
           padding: '8px 10px',
@@ -259,6 +301,22 @@ export default function NavbarGlass({
           boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34), 0 0 0 1px rgba(15,23,42,0.18)',
         }}
       >
+        <span
+          ref={logoShimmerRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: '-30%',
+            bottom: '-30%',
+            left: '-45%',
+            width: '46%',
+            background: 'linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0) 100%)',
+            mixBlendMode: 'screen',
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
         <img
           src={logoSrc}
           alt="CampusXR"
@@ -269,6 +327,8 @@ export default function NavbarGlass({
             objectFit: 'contain',
             userSelect: 'none',
             filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.40))',
+            position: 'relative',
+            zIndex: 1,
           }}
         />
       </div>
@@ -288,8 +348,15 @@ export default function NavbarGlass({
               ref={toggleBtnRef}
               id="navbar-3d-toggle"
               onClick={onToggle3D}
+              onMouseEnter={() => {
+                if (reducedMotionRef.current) return;
+                runGlassShimmer(toggleShimmerRef.current, { peak: 0.26, duration: 1.04 });
+              }}
               title="Next-gen neural rendering demo (Beta)"
               style={{
+                position: 'relative',
+                overflow: 'hidden',
+                isolation: 'isolate',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '7px',
@@ -312,11 +379,30 @@ export default function NavbarGlass({
                 transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
               }}
             >
-              <span ref={cubeIconRef} style={{ color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex', transformOrigin: '50% 50%' }}>
-                <Icons.Cube />
+              <span
+                ref={toggleShimmerRef}
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: '-45%',
+                  bottom: '-45%',
+                  left: '-42%',
+                  width: '40%',
+                  background: 'linear-gradient(112deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 50%, rgba(255,255,255,0) 100%)',
+                  mixBlendMode: 'screen',
+                  opacity: 0,
+                  pointerEvents: 'none',
+                }}
+              />
+              <span style={{ position: 'relative', zIndex: 1, color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex' }}>
+                <span ref={cubeIconRef} style={{ display: 'flex', transformOrigin: '50% 50%' }}>
+                  <Icons.Cube />
+                </span>
               </span>
-              3D Mode
+              <span style={{ position: 'relative', zIndex: 1 }}>3D Mode</span>
               <span ref={betaBadgeRef} style={{
+                position: 'relative',
+                zIndex: 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 padding: '1px 6px',
@@ -342,6 +428,9 @@ export default function NavbarGlass({
             onClick={onAdminClick}
             title="Admin login"
             style={{
+              position: 'relative',
+              overflow: 'hidden',
+              isolation: 'isolate',
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
@@ -362,6 +451,9 @@ export default function NavbarGlass({
               transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
             }}
             onMouseEnter={e => {
+              if (!reducedMotionRef.current) {
+                runGlassShimmer(adminShimmerRef.current, { peak: 0.24, duration: 1.04 });
+              }
               e.currentTarget.style.color = '#ffffff';
               e.currentTarget.style.background = PILL_ACTIVE_BG;
               e.currentTarget.style.border = PILL_ACTIVE_BORDER;
@@ -374,8 +466,25 @@ export default function NavbarGlass({
               e.currentTarget.style.boxShadow = GLASS_SHADOW;
             }}
           >
-            <Icons.Lock />
-            Admin
+            <span
+              ref={adminShimmerRef}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: '-45%',
+                bottom: '-45%',
+                left: '-42%',
+                width: '40%',
+                background: 'linear-gradient(112deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 50%, rgba(255,255,255,0) 100%)',
+                mixBlendMode: 'screen',
+                opacity: 0,
+                pointerEvents: 'none',
+              }}
+            />
+            <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>
+              <Icons.Lock />
+            </span>
+            <span style={{ position: 'relative', zIndex: 1 }}>Admin</span>
           </button>
         </MagneticWrap>
       </div>

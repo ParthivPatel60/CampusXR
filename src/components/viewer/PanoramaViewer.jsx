@@ -168,6 +168,22 @@ function buildMarkerEl(hs, onClickCb) {
     });
     btn.dataset.inView = '0';
 
+    // Adaptive spotlight aura (camera-heading driven in animate loop)
+    const aura = document.createElement('span');
+    Object.assign(aura.style, {
+        position: 'absolute',
+        inset: '-12px',
+        borderRadius: '50%',
+        background: c.glow,
+        filter: 'blur(8px)',
+        opacity: '0.08',
+        pointerEvents: 'none',
+        transform: 'scale(0.92)',
+        transformOrigin: '50% 50%',
+        willChange: 'transform, opacity',
+    });
+    btn.appendChild(aura);
+
     // Pulse halo
     const halo = document.createElement('span');
     Object.assign(halo.style, {
@@ -262,6 +278,11 @@ function buildMarkerEl(hs, onClickCb) {
     });
     btn.addEventListener('click', (e) => { e.stopPropagation(); onClickCb(hs); });
     btn.__ringEl = ring;
+    btn.__spotlightSet = {
+        auraOpacity: gsap.quickSetter(aura, 'opacity'),
+        auraScale: gsap.quickSetter(aura, 'scale'),
+        haloOpacity: gsap.quickSetter(halo, 'opacity'),
+    };
 
     return btn;
 }
@@ -589,6 +610,12 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
 
         // Reusable vector to avoid per-frame allocations
         const _projVec = new THREE.Vector3();
+        // GSAP utility mappers for adaptive hotspot spotlight
+        const clamp01 = gsap.utils.clamp(0, 1);
+        const normalizeDistance = gsap.utils.normalize(0, 1.1); // NDC distance from center
+        const mapAuraOpacity = gsap.utils.mapRange(0, 1, 0.08, 0.62);
+        const mapAuraScale = gsap.utils.mapRange(0, 1, 0.92, 1.24);
+        const mapHaloOpacity = gsap.utils.mapRange(0, 1, 0.28, 0.82);
 
         // ── Animation loop ────────────────────────────────────────────────────────
         let animId;
@@ -643,8 +670,27 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                         el.style.left = `${(_projVec.x + 1) / 2 * w}px`;
                         el.style.top  = `${(1 - _projVec.y) / 2 * h}px`;
                         setHotspotVisibility(el, true);
+
+                        // Adaptive spotlight: stronger glow when hotspot is near
+                        // camera heading (screen center), weaker toward edges.
+                        const setters = el.__spotlightSet;
+                        if (setters && !prefersReducedMotion()) {
+                            const distance = Math.hypot(_projVec.x, _projVec.y);
+                            const normalized = clamp01(normalizeDistance(distance));
+                            const focusRaw = 1 - normalized;
+                            const focus = focusRaw * focusRaw; // center-biased falloff
+                            setters.auraOpacity(mapAuraOpacity(focus));
+                            setters.auraScale(mapAuraScale(focus));
+                            setters.haloOpacity(mapHaloOpacity(focus));
+                        }
                     } else {
                         setHotspotVisibility(el, false);
+                        const setters = el.__spotlightSet;
+                        if (setters) {
+                            setters.auraOpacity(0.08);
+                            setters.auraScale(0.92);
+                            setters.haloOpacity(0.28);
+                        }
                     }
                 }
             }

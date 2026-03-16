@@ -11,7 +11,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React from 'react';
+import React, { useMemo, useRef } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 /* Location pin SVG */
 function PinIcon() {
@@ -48,6 +50,67 @@ function Badge360() {
 }
 
 export default function LocationLabel({ location = 'Terrace', dept = '' }) {
+    const roomTextRef = useRef(null);
+    const deptTextRef = useRef(null);
+
+    const roomChars = useMemo(() => Array.from(String(location || '')), [location]);
+    const deptWords = useMemo(
+        () => String(dept || '').trim().split(/\s+/).filter(Boolean),
+        [dept],
+    );
+
+    useGSAP(() => {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const roomEls = roomTextRef.current
+            ? Array.from(roomTextRef.current.querySelectorAll('[data-room-char="1"]'))
+            : [];
+        const deptEls = deptTextRef.current
+            ? Array.from(deptTextRef.current.querySelectorAll('[data-dept-word="1"]'))
+            : [];
+
+        if (!roomEls.length && !deptEls.length) return;
+
+        gsap.killTweensOf([...roomEls, ...deptEls]);
+        if (reduced) {
+            gsap.set([...roomEls, ...deptEls], { clearProps: 'all', opacity: 1 });
+            return;
+        }
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+        if (roomEls.length) {
+            tl.fromTo(
+                roomEls,
+                { opacity: 0, y: 10, filter: 'blur(8px)' },
+                {
+                    opacity: 1,
+                    y: 0,
+                    filter: 'blur(0px)',
+                    duration: 0.5,
+                    stagger: 0.018,
+                    clearProps: 'opacity,transform,filter',
+                },
+                0,
+            );
+        }
+
+        if (deptEls.length) {
+            tl.fromTo(
+                deptEls,
+                { opacity: 0, y: 6, filter: 'blur(6px)' },
+                {
+                    opacity: 1,
+                    y: 0,
+                    filter: 'blur(0px)',
+                    duration: 0.38,
+                    stagger: 0.04,
+                    clearProps: 'opacity,transform,filter',
+                },
+                0.1,
+            );
+        }
+    }, { dependencies: [location, dept] });
+
     return (
         <div
             id="location-label"
@@ -91,15 +154,24 @@ export default function LocationLabel({ location = 'Terrace', dept = '' }) {
                 <span style={{ color: 'rgba(255,255,255,0.55)' }}><PinIcon /></span>
 
                 {/* Room name */}
-                <span style={{
+                <span ref={roomTextRef} aria-hidden="true" style={{
                     color: '#ffffff',
                     fontSize: '14px',
                     fontWeight: 600,
                     letterSpacing: '-0.2px',
                     fontFamily: 'Montserrat, sans-serif',
                     userSelect: 'none',
+                    display: 'inline-flex',
                 }}>
-                    {location}
+                    {roomChars.map((ch, index) => (
+                        <span
+                            key={`${ch}-${index}`}
+                            data-room-char="1"
+                            style={{ display: 'inline-block', willChange: 'transform, opacity, filter' }}
+                        >
+                            {ch === ' ' ? '\u00A0' : ch}
+                        </span>
+                    ))}
                 </span>
 
                 <Badge360 />
@@ -125,8 +197,23 @@ export default function LocationLabel({ location = 'Terrace', dept = '' }) {
                         letterSpacing: '0.12em',
                         textTransform: 'uppercase',
                         userSelect: 'none',
+                        display: 'inline-flex',
                     }}>
-                        {dept}
+                        <span ref={deptTextRef} aria-hidden="true" style={{ display: 'inline-flex' }}>
+                            {deptWords.map((word, index) => (
+                                <span
+                                    key={`${word}-${index}`}
+                                    data-dept-word="1"
+                                    style={{
+                                        display: 'inline-block',
+                                        marginRight: index < deptWords.length - 1 ? '0.28em' : 0,
+                                        willChange: 'transform, opacity, filter',
+                                    }}
+                                >
+                                    {word}
+                                </span>
+                            ))}
+                        </span>
                     </span>
                 </div>
             )}
