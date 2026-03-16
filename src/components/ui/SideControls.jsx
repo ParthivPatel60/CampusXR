@@ -93,18 +93,49 @@ function GBtn({ icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
     const wrapRef = useRef(null);
     const magRef = useRef({ xTo: null, yTo: null, rTo: null });
     const reducedMotionRef = useRef(false);
+    const motionCfgRef = useRef({ strength: 5, rotate: 1.1 });
 
     useEffect(() => {
-        reducedMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reducedMotionRef.current || !wrapRef.current) return;
+        if (!wrapRef.current) return undefined;
 
-        const el = wrapRef.current;
-        magRef.current.xTo = gsap.quickTo(el, 'x', { duration: 0.22, ease: 'power3.out' });
-        magRef.current.yTo = gsap.quickTo(el, 'y', { duration: 0.22, ease: 'power3.out' });
-        magRef.current.rTo = gsap.quickTo(el, 'rotation', { duration: 0.28, ease: 'power3.out' });
+        const ctx = gsap.context(() => {}, wrapRef);
+        const mm = gsap.matchMedia();
+
+        mm.add(
+            {
+                reduce: '(prefers-reduced-motion: reduce)',
+                mobile: '(max-width: 767px)',
+                desktop: '(min-width: 768px)',
+            },
+            (mediaCtx) => {
+                const { reduce, mobile } = mediaCtx.conditions;
+                reducedMotionRef.current = !!reduce;
+
+                if (reduce || !wrapRef.current) {
+                    motionCfgRef.current = { strength: 0, rotate: 0 };
+                    return undefined;
+                }
+
+                const cfg = mobile
+                    ? { strength: 3.5, rotate: 0.75, durXY: 0.26, durR: 0.32 }
+                    : { strength: 5, rotate: 1.1, durXY: 0.22, durR: 0.28 };
+                motionCfgRef.current = { strength: cfg.strength, rotate: cfg.rotate };
+
+                const el = wrapRef.current;
+                magRef.current.xTo = gsap.quickTo(el, 'x', { duration: cfg.durXY, ease: 'power3.out' });
+                magRef.current.yTo = gsap.quickTo(el, 'y', { duration: cfg.durXY, ease: 'power3.out' });
+                magRef.current.rTo = gsap.quickTo(el, 'rotation', { duration: cfg.durR, ease: 'power3.out' });
+
+                return () => {
+                    gsap.set(el, { clearProps: 'transform' });
+                    magRef.current = { xTo: null, yTo: null, rTo: null };
+                };
+            },
+        );
 
         return () => {
-            gsap.set(el, { clearProps: 'transform' });
+            mm.revert();
+            ctx.revert();
         };
     }, []);
 
@@ -115,9 +146,9 @@ function GBtn({ icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
         const ny = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
         const cx = gsap.utils.clamp(-1, 1, nx);
         const cy = gsap.utils.clamp(-1, 1, ny);
-        magRef.current.xTo?.(cx * 5);
-        magRef.current.yTo?.(cy * 5);
-        magRef.current.rTo?.(cx * 1.1);
+        magRef.current.xTo?.(cx * motionCfgRef.current.strength);
+        magRef.current.yTo?.(cy * motionCfgRef.current.strength);
+        magRef.current.rTo?.(cx * motionCfgRef.current.rotate);
     };
 
     const handlePointerLeave = () => {

@@ -93,6 +93,7 @@ function setHotspotVisibility(el, visible) {
 function setArrowVisibility(el, visible) {
     if (!el) return;
     const btn = el.__btnEl;
+    const reduceMotion = !!el.__motionProfile?.reduce;
 
     if (visible) {
         if (el.dataset.inView === '1') return;
@@ -102,7 +103,7 @@ function setArrowVisibility(el, visible) {
         if (!btn) return;
         gsap.killTweensOf(btn);
 
-        if (prefersReducedMotion()) {
+        if (reduceMotion) {
             btn.style.opacity = '1';
             return;
         }
@@ -124,7 +125,7 @@ function setArrowVisibility(el, visible) {
     }
 
     gsap.killTweensOf(btn);
-    if (prefersReducedMotion()) {
+    if (reduceMotion) {
         el.style.display = 'none';
         return;
     }
@@ -390,29 +391,56 @@ function buildArrowEl(hs, onClickCb) {
 
     wrapper.appendChild(btn);
     wrapper.__btnEl = btn;
+    wrapper.__motionProfile = { reduce: prefersReducedMotion(), mobile: false };
+    wrapper.__mm = gsap.matchMedia();
 
-    if (!prefersReducedMotion()) {
-        const seed = Math.abs(Number(hs?.yaw ?? 0)) % 360;
-        const delay = (seed / 360) * 0.45;
-        const driftTween = gsap.to(btn, {
-            y: -2.5,
-            duration: 1.9,
-            ease: 'sine.inOut',
-            yoyo: true,
-            repeat: -1,
-            delay,
-        });
-        const breatheTween = gsap.to(svg, {
-            scale: 1.04,
-            duration: 1.7,
-            ease: 'sine.inOut',
-            yoyo: true,
-            repeat: -1,
-            delay: delay * 0.7,
-            transformOrigin: '50% 50%',
-        });
-        wrapper.__driftTweens = [driftTween, breatheTween];
-    }
+    wrapper.__mm.add(
+        {
+            reduce: '(prefers-reduced-motion: reduce)',
+            mobile: '(max-width: 767px)',
+            desktop: '(min-width: 768px)',
+        },
+        (mediaCtx) => {
+            const { reduce, mobile } = mediaCtx.conditions;
+            wrapper.__motionProfile = { reduce: !!reduce, mobile: !!mobile };
+
+            if (Array.isArray(wrapper.__driftTweens)) {
+                wrapper.__driftTweens.forEach((t) => t?.kill?.());
+                wrapper.__driftTweens = null;
+            }
+
+            if (reduce) return undefined;
+
+            const driftCfg = mobile
+                ? { y: -1.5, driftDur: 2.4, breatheScale: 1.02, breatheDur: 2.2 }
+                : { y: -2.5, driftDur: 1.9, breatheScale: 1.04, breatheDur: 1.7 };
+            const seed = Math.abs(Number(hs?.yaw ?? 0)) % 360;
+            const delay = (seed / 360) * 0.45;
+            const driftTween = gsap.to(btn, {
+                y: driftCfg.y,
+                duration: driftCfg.driftDur,
+                ease: 'sine.inOut',
+                yoyo: true,
+                repeat: -1,
+                delay,
+            });
+            const breatheTween = gsap.to(svg, {
+                scale: driftCfg.breatheScale,
+                duration: driftCfg.breatheDur,
+                ease: 'sine.inOut',
+                yoyo: true,
+                repeat: -1,
+                delay: delay * 0.7,
+                transformOrigin: '50% 50%',
+            });
+            wrapper.__driftTweens = [driftTween, breatheTween];
+
+            return () => {
+                driftTween.kill();
+                breatheTween.kill();
+            };
+        },
+    );
 
     // Hover feedback
     btn.addEventListener('mouseenter', () => {
@@ -459,6 +487,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     useEffect(() => {
         const container = markersContainerRef.current;
         if (!container) return;
+        const ctx = gsap.context(() => {}, container);
 
         while (container.firstChild) {
             gsap.killTweensOf(container.firstChild);
@@ -469,17 +498,23 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             const el = buildMarkerEl(hs, (clicked) => onClickRef.current?.(clicked));
             container.appendChild(el);
         });
+
+        return () => {
+            ctx.revert();
+        };
     }, [hotspots]);
 
     // ── Rebuild Street-View nav arrows whenever hotspots change ──────────────
     useEffect(() => {
         const anchor = arrowsAnchorRef.current;
         if (!anchor) return;
+        const ctx = gsap.context(() => {}, anchor);
         while (anchor.firstChild) {
             const node = anchor.firstChild;
             if (Array.isArray(node.__driftTweens)) {
                 node.__driftTweens.forEach((t) => t?.kill?.());
             }
+            node.__mm?.revert?.();
             if (node.__btnEl) gsap.killTweensOf(node.__btnEl);
             anchor.removeChild(node);
         }
@@ -489,12 +524,17 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                 const el = buildArrowEl(hs, clicked => onClickRef.current?.(clicked));
                 anchor.appendChild(el);
             });
+
+        return () => {
+            ctx.revert();
+        };
     }, [hotspots]);
 
     // ── Three.js scene — only re-initialises when imageURL changes ────────────
     useEffect(() => {
         if (!imageURL) return;
         const mount = mountRef.current;
+        const ctx = gsap.context(() => {}, mount);
         const width = mount.clientWidth;
         const height = mount.clientHeight;
 
@@ -819,10 +859,12 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     if (Array.isArray(node.__driftTweens)) {
                         node.__driftTweens.forEach((t) => t?.kill?.());
                     }
+                    node.__mm?.revert?.();
                     if (node.__btnEl) gsap.killTweensOf(node.__btnEl);
                 });
             }
             if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
+            ctx.revert();
         };
     }, [imageURL, initialView?.yaw, initialView?.pitch, initialView?.fov]); // re-initialise whenever room view defaults change
 
