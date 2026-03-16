@@ -16,6 +16,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import gsap from 'gsap';
 
 // ── Inline hotspot styles — mirrors HotspotMarker.jsx design tokens ──────────
 const TYPE_STYLES = {
@@ -29,6 +30,118 @@ const ARROW_MIN_Y_RATIO = 0.70;
 const ARROW_MAX_Y_RATIO = 0.95;
 const ARROW_Y_OFFSET_PX = 26;
 const ARROW_PANEL_GAP_PX = 6;
+
+const prefersReducedMotion = () => (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+);
+
+function setHotspotVisibility(el, visible) {
+    if (!el) return;
+    const ring = el.__ringEl;
+
+    if (visible) {
+        if (el.dataset.inView === '1') return;
+        el.dataset.inView = '1';
+        el.style.display = '';
+
+        gsap.killTweensOf(el);
+        if (ring) gsap.killTweensOf(ring);
+
+        if (prefersReducedMotion()) {
+            el.style.opacity = '1';
+            return;
+        }
+
+        gsap.set(el, { opacity: 0 });
+        if (ring) gsap.set(ring, { scale: 0.84, transformOrigin: '50% 50%' });
+
+        const tl = gsap.timeline();
+        tl.to(el, { opacity: 1, duration: 0.2, ease: 'power2.out' }, 0);
+        if (ring) {
+            tl.to(ring, {
+                scale: 1,
+                duration: 0.26,
+                ease: 'back.out(1.6)',
+                clearProps: 'transform',
+            }, 0);
+        }
+        return;
+    }
+
+    if (el.dataset.inView === '0') return;
+    el.dataset.inView = '0';
+    gsap.killTweensOf(el);
+    if (ring) gsap.killTweensOf(ring);
+
+    if (prefersReducedMotion()) {
+        el.style.display = 'none';
+        return;
+    }
+
+    gsap.to(el, {
+        opacity: 0,
+        duration: 0.16,
+        ease: 'power2.in',
+        onComplete: () => {
+            if (el.dataset.inView === '0') {
+                el.style.display = 'none';
+            }
+        },
+    });
+}
+
+function setArrowVisibility(el, visible) {
+    if (!el) return;
+    const btn = el.__btnEl;
+
+    if (visible) {
+        if (el.dataset.inView === '1') return;
+        el.dataset.inView = '1';
+        el.style.display = 'flex';
+
+        if (!btn) return;
+        gsap.killTweensOf(btn);
+
+        if (prefersReducedMotion()) {
+            btn.style.opacity = '1';
+            return;
+        }
+
+        gsap.fromTo(
+            btn,
+            { scale: 0.88, opacity: 0.25 },
+            { scale: 1, opacity: 1, duration: 0.24, ease: 'power2.out', overwrite: true },
+        );
+        return;
+    }
+
+    if (el.dataset.inView === '0') return;
+    el.dataset.inView = '0';
+
+    if (!btn) {
+        el.style.display = 'none';
+        return;
+    }
+
+    gsap.killTweensOf(btn);
+    if (prefersReducedMotion()) {
+        el.style.display = 'none';
+        return;
+    }
+
+    gsap.to(btn, {
+        scale: 0.92,
+        opacity: 0,
+        duration: 0.16,
+        ease: 'power2.in',
+        overwrite: true,
+        onComplete: () => {
+            if (el.dataset.inView === '0') {
+                el.style.display = 'none';
+            }
+        },
+    });
+}
 
 /** Build a single hotspot marker DOM element matching HotspotMarker.jsx visuals. */
 function buildMarkerEl(hs, onClickCb) {
@@ -49,8 +162,11 @@ function buildMarkerEl(hs, onClickCb) {
         padding: '0',
         outline: 'none',
         display: 'none',      // hidden until first projection places it
+        opacity: '0',
         pointerEvents: 'auto',
+        willChange: 'opacity',
     });
+    btn.dataset.inView = '0';
 
     // Pulse halo
     const halo = document.createElement('span');
@@ -81,6 +197,7 @@ function buildMarkerEl(hs, onClickCb) {
         WebkitBackdropFilter: 'blur(6px)',
         boxShadow: `0 0 16px ${c.glow}, 0 4px 12px rgba(0,0,0,0.30)`,
         transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease',
+        transformOrigin: '50% 50%',
     });
 
     // Inner dot
@@ -144,6 +261,7 @@ function buildMarkerEl(hs, onClickCb) {
         dot.style.transform = 'scale(1)';
     });
     btn.addEventListener('click', (e) => { e.stopPropagation(); onClickCb(hs); });
+    btn.__ringEl = ring;
 
     return btn;
 }
@@ -177,7 +295,9 @@ function buildArrowEl(hs, onClickCb) {
         WebkitUserSelect: 'none',
         opacity: '0',
         transition: 'opacity 0.3s ease',
+        willChange: 'transform, opacity',
     });
+    wrapper.dataset.inView = '0';
 
     // Clickable button (covers the whole element)
     const btn = document.createElement('button');
@@ -192,6 +312,7 @@ function buildArrowEl(hs, onClickCb) {
         cursor: 'pointer',
         outline: 'none',
         pointerEvents: 'auto',
+        willChange: 'transform, opacity',
     });
 
     // ── Arrow SVG — wide flat chevron (matches screenshot proportions) ────────
@@ -247,6 +368,30 @@ function buildArrowEl(hs, onClickCb) {
     btn.appendChild(label);
 
     wrapper.appendChild(btn);
+    wrapper.__btnEl = btn;
+
+    if (!prefersReducedMotion()) {
+        const seed = Math.abs(Number(hs?.yaw ?? 0)) % 360;
+        const delay = (seed / 360) * 0.45;
+        const driftTween = gsap.to(btn, {
+            y: -2.5,
+            duration: 1.9,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            delay,
+        });
+        const breatheTween = gsap.to(svg, {
+            scale: 1.04,
+            duration: 1.7,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            delay: delay * 0.7,
+            transformOrigin: '50% 50%',
+        });
+        wrapper.__driftTweens = [driftTween, breatheTween];
+    }
 
     // Hover feedback
     btn.addEventListener('mouseenter', () => {
@@ -294,7 +439,11 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
         const container = markersContainerRef.current;
         if (!container) return;
 
-        while (container.firstChild) container.removeChild(container.firstChild);
+        while (container.firstChild) {
+            gsap.killTweensOf(container.firstChild);
+            if (container.firstChild.__ringEl) gsap.killTweensOf(container.firstChild.__ringEl);
+            container.removeChild(container.firstChild);
+        }
         hotspots.forEach((hs) => {
             const el = buildMarkerEl(hs, (clicked) => onClickRef.current?.(clicked));
             container.appendChild(el);
@@ -305,7 +454,14 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
     useEffect(() => {
         const anchor = arrowsAnchorRef.current;
         if (!anchor) return;
-        while (anchor.firstChild) anchor.removeChild(anchor.firstChild);
+        while (anchor.firstChild) {
+            const node = anchor.firstChild;
+            if (Array.isArray(node.__driftTweens)) {
+                node.__driftTweens.forEach((t) => t?.kill?.());
+            }
+            if (node.__btnEl) gsap.killTweensOf(node.__btnEl);
+            anchor.removeChild(node);
+        }
         hotspots
             .filter(h => h.type === 'navigation')
             .forEach(hs => {
@@ -486,9 +642,9 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     if (visible) {
                         el.style.left = `${(_projVec.x + 1) / 2 * w}px`;
                         el.style.top  = `${(1 - _projVec.y) / 2 * h}px`;
-                        el.style.display = '';
+                        setHotspotVisibility(el, true);
                     } else {
-                        el.style.display = 'none';
+                        setHotspotVisibility(el, false);
                     }
                 }
             }
@@ -523,7 +679,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
                     // but clamp the arrow to the lower third of the viewport
                     // so it always appears near floor level.
                     if (!inFront) {
-                        el.style.display = 'none';
+                        setArrowVisibility(el, false);
                         continue;
                     }
 
@@ -554,7 +710,7 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
 
                     el.style.left    = `${sx.toFixed(1)}px`;
                     el.style.top     = `${clampedY.toFixed(1)}px`;
-                    el.style.display = 'flex';
+                    setArrowVisibility(el, true);
                     el.style.transform = `translate(-50%, -50%) rotate(${screenAngle.toFixed(1)}deg)`;
 
                     // Fade based on how far the hotspot is from screen center
@@ -604,6 +760,22 @@ export default function PanoramaViewer({ imageURL, hotspots = [], onHotspotClick
             mount.removeEventListener('touchmove', onTouchMove);
             mount.removeEventListener('touchend', onPointerUp);
             renderer.dispose();
+            const markerContainer = markersContainerRef.current;
+            if (markerContainer) {
+                Array.from(markerContainer.children).forEach((node) => {
+                    gsap.killTweensOf(node);
+                    if (node.__ringEl) gsap.killTweensOf(node.__ringEl);
+                });
+            }
+            const arrowContainer = arrowsAnchorRef.current;
+            if (arrowContainer) {
+                Array.from(arrowContainer.children).forEach((node) => {
+                    if (Array.isArray(node.__driftTweens)) {
+                        node.__driftTweens.forEach((t) => t?.kill?.());
+                    }
+                    if (node.__btnEl) gsap.killTweensOf(node.__btnEl);
+                });
+            }
             if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
         };
     }, [imageURL, initialView?.yaw, initialView?.pitch, initialView?.fov]); // re-initialise whenever room view defaults change

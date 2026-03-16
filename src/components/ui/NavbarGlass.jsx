@@ -15,9 +15,60 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import logoSrc from '../../assets/logo.png';
 import { GLASS_SHADOW, GLASS_BLUR, PILL_ACTIVE_BG, PILL_ACTIVE_BORDER, PILL_IDLE_BG, PILL_IDLE_BORDER } from '../../constants/glassTokens';
+
+function MagneticWrap({ children, strength = 8, rotate = 1.2 }) {
+  const wrapRef = useRef(null);
+  const magRef = useRef({ xTo: null, yTo: null, rTo: null });
+  const reducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    reducedMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotionRef.current || !wrapRef.current) return;
+
+    const el = wrapRef.current;
+    magRef.current.xTo = gsap.quickTo(el, 'x', { duration: 0.24, ease: 'power3.out' });
+    magRef.current.yTo = gsap.quickTo(el, 'y', { duration: 0.24, ease: 'power3.out' });
+    magRef.current.rTo = gsap.quickTo(el, 'rotation', { duration: 0.3, ease: 'power3.out' });
+
+    return () => {
+      gsap.set(el, { clearProps: 'transform' });
+    };
+  }, []);
+
+  const handlePointerMove = (e) => {
+    if (reducedMotionRef.current || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const nx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
+    const ny = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
+    const cx = gsap.utils.clamp(-1, 1, nx);
+    const cy = gsap.utils.clamp(-1, 1, ny);
+    magRef.current.xTo?.(cx * strength);
+    magRef.current.yTo?.(cy * strength);
+    magRef.current.rTo?.(cx * rotate);
+  };
+
+  const handlePointerLeave = () => {
+    if (reducedMotionRef.current) return;
+    magRef.current.xTo?.(0);
+    magRef.current.yTo?.(0);
+    magRef.current.rTo?.(0);
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={{ display: 'inline-flex', willChange: 'transform' }}
+    >
+      {children}
+    </div>
+  );
+}
 
 /* ─── SVG icon set ─────────────────────────────────────────────────────────── */
 const Icons = {
@@ -115,6 +166,76 @@ export default function NavbarGlass({
   show3DToggle = false,
   onAdminClick,
 }) {
+  const toggleBtnRef = useRef(null);
+  const cubeIconRef = useRef(null);
+  const betaBadgeRef = useRef(null);
+  const pulseTlRef = useRef(null);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!show3DToggle || !toggleBtnRef.current) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+
+    pulseTlRef.current?.kill();
+
+    const glow = is3DMode
+      ? `0 0 26px rgba(251,191,36,0.62)`
+      : `0 0 20px rgba(108,99,255,0.45)`;
+
+    const tl = gsap.timeline();
+    tl.fromTo(
+      toggleBtnRef.current,
+      { scale: 1 },
+      {
+        scale: 1.06,
+        boxShadow: `${GLASS_SHADOW}, ${glow}`,
+        duration: 0.15,
+        ease: 'power2.out',
+      },
+    )
+      .to(toggleBtnRef.current, {
+        scale: 1,
+        duration: 0.22,
+        ease: 'power2.inOut',
+        clearProps: 'transform,boxShadow',
+      })
+      .fromTo(
+        cubeIconRef.current,
+        { scale: 1, rotate: 0 },
+        {
+          scale: 1.22,
+          rotate: is3DMode ? 16 : -16,
+          duration: 0.14,
+          ease: 'power1.inOut',
+          yoyo: true,
+          repeat: 1,
+          clearProps: 'transform',
+        },
+        0,
+      )
+      .fromTo(
+        betaBadgeRef.current,
+        { scale: 1 },
+        {
+          scale: 1.12,
+          duration: 0.12,
+          ease: 'power1.out',
+          yoyo: true,
+          repeat: 1,
+          clearProps: 'transform',
+        },
+        0.03,
+      );
+
+    pulseTlRef.current = tl;
+  }, [is3DMode, show3DToggle]);
 
   return (
     <div
@@ -162,24 +283,76 @@ export default function NavbarGlass({
       >
         {/* 3D Mode toggle — only shown when the active room has a splat3DUrl */}
         {show3DToggle && (
+          <MagneticWrap strength={8} rotate={1.2}>
+            <button
+              ref={toggleBtnRef}
+              id="navbar-3d-toggle"
+              onClick={onToggle3D}
+              title="Next-gen neural rendering demo (Beta)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                padding: '8px 16px',
+                borderRadius: '50px',
+                background: is3DMode ? 'rgba(245,158,11,0.22)' : PILL_IDLE_BG,
+                backdropFilter: GLASS_BLUR,
+                WebkitBackdropFilter: GLASS_BLUR,
+                boxShadow: is3DMode
+                  ? `${GLASS_SHADOW}, 0 0 16px rgba(251,191,36,0.30)`
+                  : GLASS_SHADOW,
+                border: is3DMode ? '2px solid rgba(251,191,36,0.80)' : PILL_IDLE_BORDER,
+                color: is3DMode ? '#fde68a' : 'rgba(255,255,255,0.72)',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
+              }}
+            >
+              <span ref={cubeIconRef} style={{ color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex', transformOrigin: '50% 50%' }}>
+                <Icons.Cube />
+              </span>
+              3D Mode
+              <span ref={betaBadgeRef} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '1px 6px',
+                borderRadius: '20px',
+                background: 'rgba(251,191,36,0.18)',
+                border: '1.5px solid rgba(251,191,36,0.65)',
+                color: '#fbbf24',
+                fontSize: '8px',
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+              }}>
+                Beta
+              </span>
+            </button>
+          </MagneticWrap>
+        )}
+
+        {/* Admin Login */}
+        <MagneticWrap strength={8} rotate={1.2}>
           <button
-            id="navbar-3d-toggle"
-            onClick={onToggle3D}
-            title="Next-gen neural rendering demo (Beta)"
+            id="navbar-admin-btn"
+            onClick={onAdminClick}
+            title="Admin login"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
               padding: '8px 16px',
               borderRadius: '50px',
-              background: is3DMode ? 'rgba(245,158,11,0.22)' : PILL_IDLE_BG,
+              background: PILL_IDLE_BG,
               backdropFilter: GLASS_BLUR,
               WebkitBackdropFilter: GLASS_BLUR,
-              boxShadow: is3DMode
-                ? `${GLASS_SHADOW}, 0 0 16px rgba(251,191,36,0.30)`
-                : GLASS_SHADOW,
-              border: is3DMode ? '2px solid rgba(251,191,36,0.80)' : PILL_IDLE_BORDER,
-              color: is3DMode ? '#fde68a' : 'rgba(255,255,255,0.72)',
+              boxShadow: GLASS_SHADOW,
+              border: PILL_IDLE_BORDER,
+              color: 'rgba(255,255,255,0.72)',
               fontSize: '11px',
               fontWeight: 600,
               letterSpacing: '0.08em',
@@ -188,70 +361,23 @@ export default function NavbarGlass({
               outline: 'none',
               transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
             }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.background = PILL_ACTIVE_BG;
+              e.currentTarget.style.border = PILL_ACTIVE_BORDER;
+              e.currentTarget.style.boxShadow = `${GLASS_SHADOW}, 0 0 14px rgba(108,99,255,0.35)`;
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.72)';
+              e.currentTarget.style.background = PILL_IDLE_BG;
+              e.currentTarget.style.border = PILL_IDLE_BORDER;
+              e.currentTarget.style.boxShadow = GLASS_SHADOW;
+            }}
           >
-            <span style={{ color: is3DMode ? '#fbbf24' : 'inherit', display: 'flex' }}>
-              <Icons.Cube />
-            </span>
-            3D Mode
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '1px 6px',
-              borderRadius: '20px',
-              background: 'rgba(251,191,36,0.18)',
-              border: '1.5px solid rgba(251,191,36,0.65)',
-              color: '#fbbf24',
-              fontSize: '8px',
-              fontWeight: 700,
-              letterSpacing: '0.10em',
-              textTransform: 'uppercase',
-            }}>
-              Beta
-            </span>
+            <Icons.Lock />
+            Admin
           </button>
-        )}
-
-        {/* Admin Login */}
-        <button
-          id="navbar-admin-btn"
-          onClick={onAdminClick}
-          title="Admin login"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '7px',
-            padding: '8px 16px',
-            borderRadius: '50px',
-            background: PILL_IDLE_BG,
-            backdropFilter: GLASS_BLUR,
-            WebkitBackdropFilter: GLASS_BLUR,
-            boxShadow: GLASS_SHADOW,
-            border: PILL_IDLE_BORDER,
-            color: 'rgba(255,255,255,0.72)',
-            fontSize: '11px',
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            outline: 'none',
-            transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.color = '#ffffff';
-            e.currentTarget.style.background = PILL_ACTIVE_BG;
-            e.currentTarget.style.border = PILL_ACTIVE_BORDER;
-            e.currentTarget.style.boxShadow = `${GLASS_SHADOW}, 0 0 14px rgba(108,99,255,0.35)`;
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.color = 'rgba(255,255,255,0.72)';
-            e.currentTarget.style.background = PILL_IDLE_BG;
-            e.currentTarget.style.border = PILL_IDLE_BORDER;
-            e.currentTarget.style.boxShadow = GLASS_SHADOW;
-          }}
-        >
-          <Icons.Lock />
-          Admin
-        </button>
+        </MagneticWrap>
       </div>
     </div>
   );
