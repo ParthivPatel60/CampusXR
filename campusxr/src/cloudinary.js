@@ -1,5 +1,5 @@
-export const CLOUD_NAME = "dsdll4n92";
-export const UPLOAD_PRESET = "campusxr_unsigned";
+export const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? "dsdll4n92";
+export const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ?? "campusxr_unsigned";
 
 export async function uploadImageToCloudinary(file) {
   const formData = new FormData();
