@@ -17,7 +17,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import { GLASS_BG as PANEL_BG, GLASS_SHADOW as PANEL_SHADOW, GLASS_BLUR as BLUR, BTN_BG, BTN_BORDER } from '../../constants/glassTokens';
 
 /* ─── Tiny SVG icons ─────────────────────────────────────────────────────── */
@@ -89,9 +90,82 @@ function GBtn({ icon, label, onClick, size = 40, glow = 'rgba(200,200,255,0.5)',
                 tooltipSide = 'right' }) {
     const [hov, setHov] = useState(false);
     const [prs, setPrs] = useState(false);
+    const wrapRef = useRef(null);
+    const magRef = useRef({ xTo: null, yTo: null, rTo: null });
+    const reducedMotionRef = useRef(false);
+    const motionCfgRef = useRef({ strength: 5, rotate: 1.1 });
+
+    useEffect(() => {
+        if (!wrapRef.current) return undefined;
+
+        const ctx = gsap.context(() => {}, wrapRef);
+        const mm = gsap.matchMedia();
+
+        mm.add(
+            {
+                reduce: '(prefers-reduced-motion: reduce)',
+                mobile: '(max-width: 767px)',
+                desktop: '(min-width: 768px)',
+            },
+            (mediaCtx) => {
+                const { reduce, mobile } = mediaCtx.conditions;
+                reducedMotionRef.current = !!reduce;
+
+                if (reduce || !wrapRef.current) {
+                    motionCfgRef.current = { strength: 0, rotate: 0 };
+                    return undefined;
+                }
+
+                const cfg = mobile
+                    ? { strength: 3.5, rotate: 0.75, durXY: 0.26, durR: 0.32 }
+                    : { strength: 5, rotate: 1.1, durXY: 0.22, durR: 0.28 };
+                motionCfgRef.current = { strength: cfg.strength, rotate: cfg.rotate };
+
+                const el = wrapRef.current;
+                magRef.current.xTo = gsap.quickTo(el, 'x', { duration: cfg.durXY, ease: 'power3.out' });
+                magRef.current.yTo = gsap.quickTo(el, 'y', { duration: cfg.durXY, ease: 'power3.out' });
+                magRef.current.rTo = gsap.quickTo(el, 'rotation', { duration: cfg.durR, ease: 'power3.out' });
+
+                return () => {
+                    gsap.set(el, { clearProps: 'transform' });
+                    magRef.current = { xTo: null, yTo: null, rTo: null };
+                };
+            },
+        );
+
+        return () => {
+            mm.revert();
+            ctx.revert();
+        };
+    }, []);
+
+    const handlePointerMove = (e) => {
+        if (reducedMotionRef.current || !wrapRef.current) return;
+        const rect = wrapRef.current.getBoundingClientRect();
+        const nx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
+        const ny = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
+        const cx = gsap.utils.clamp(-1, 1, nx);
+        const cy = gsap.utils.clamp(-1, 1, ny);
+        magRef.current.xTo?.(cx * motionCfgRef.current.strength);
+        magRef.current.yTo?.(cy * motionCfgRef.current.strength);
+        magRef.current.rTo?.(cx * motionCfgRef.current.rotate);
+    };
+
+    const handlePointerLeave = () => {
+        if (reducedMotionRef.current) return;
+        magRef.current.xTo?.(0);
+        magRef.current.yTo?.(0);
+        magRef.current.rTo?.(0);
+    };
+
     return (
-        <div style={{ position: 'relative', display: 'flex',
-                      justifyContent: 'center', alignItems: 'center' }}>
+        <div
+            ref={wrapRef}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+            style={{ position: 'relative', display: 'flex',
+                      justifyContent: 'center', alignItems: 'center', willChange: 'transform' }}
+        >
             <button
                 onMouseEnter={() => setHov(true)}
                 onMouseLeave={() => { setHov(false); setPrs(false); }}

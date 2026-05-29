@@ -27,9 +27,13 @@
  *  onAdminClick {fn}     — navigate to admin login * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 import NavbarGlass from '../ui/NavbarGlass';
 import SideControls from '../ui/SideControls';
+
+gsap.registerPlugin(useGSAP);
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function ViewerOverlay({
@@ -46,14 +50,42 @@ export default function ViewerOverlay({
     onToggle3D,
     show3DToggle = false,
     onAdminClick,
+    roomTransitionKey,
 }) {
+    const overlayRef = useRef(null);
+    const isFirstRun = useRef(true);
+
+    useGSAP(() => {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const navbar = overlayRef.current?.querySelector('[data-anim="overlay-navbar"]');
+        const controls = overlayRef.current?.querySelector('[data-anim="overlay-controls"]');
+        if (!navbar || !controls) return;
+
+        const firstRun = isFirstRun.current;
+        isFirstRun.current = false;
+
+        if (prefersReducedMotion) {
+            gsap.set([navbar, controls], { opacity: 1, clearProps: 'all' });
+            return;
+        }
+
+        // On room transitions, delay slightly so the exit animation can finish first
+        const delay = firstRun ? 0 : 0.22;
+        gsap.killTweensOf([navbar, controls]);
+        gsap.set([navbar, controls], { opacity: 0, filter: 'blur(6px)' });
+
+        const tl = gsap.timeline({ delay, defaults: { ease: 'power2.out' } });
+        tl.to(navbar, { opacity: 1, filter: 'blur(0px)', duration: 0.4, clearProps: 'opacity,filter' })
+          .to(controls, { opacity: 1, filter: 'blur(0px)', duration: 0.38, clearProps: 'opacity,filter' }, '-=0.2');
+    }, { scope: overlayRef, dependencies: [roomTransitionKey] });
+
     return (
         /* Full-viewport overlay — pointer-events:none so panorama stays interactive.
            Individual interactive children re-enable pointer-events as needed. */
-        <div className="absolute inset-0 z-20 pointer-events-none">
+        <div ref={overlayRef} className="absolute inset-0 z-20 pointer-events-none">
 
             {/* ── 1. Top navigation bar ── */}
-            <div className="pointer-events-auto">
+            <div className="pointer-events-auto" data-anim="overlay-navbar">
                 <NavbarGlass
                     activeNav={activeNav}
                     onNavClick={onNavClick}
@@ -65,7 +97,7 @@ export default function ViewerOverlay({
             </div>
 
             {/* ── 2. Left side controls — zoom/refresh wired to Three.js camera ── */}
-            <div className="pointer-events-auto">
+            <div className="pointer-events-auto" data-anim="overlay-controls">
                 <SideControls
                     onRefresh={onRefresh}
                     onZoomIn={onZoomIn}
