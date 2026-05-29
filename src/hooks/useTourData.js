@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getDepartments, getRooms, getHotspots } from '../services/firestoreService';
 
 export function useTourData() {

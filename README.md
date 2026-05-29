@@ -26,11 +26,16 @@ A web-based platform for immersive, interactive 360° campus tours with an admin
    ```
    npm install
    ```
-2. **Run development server**
+2. **Configure environment variables**
+   ```
+   cp .env.example .env
+   ```
+   Open `.env` and fill in your Firebase project credentials (API key, project ID, etc.).
+3. **Run development server**
    ```
    npm run dev
    ```
-3. **Build for production**
+4. **Build for production**
    ```
    npm run build
    ```

@@ -1,4 +1,4 @@
-﻿import { CLOUD_NAME, UPLOAD_PRESET } from "../config/cloudinary";
+import { CLOUD_NAME, UPLOAD_PRESET } from "../config/cloudinary";
 
 /**
  * Returns a Cloudinary URL with on-the-fly resizing and optimisation.
