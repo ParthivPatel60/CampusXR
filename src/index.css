@@ -18,25 +18,35 @@
   --radius-glass-circle: 50px;
 }
 
-/* ── Bottom nav horizontal pill scroller — minimal thin scrollbar ─────────── */
-.pills-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
-}
-.pills-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-.pills-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.pills-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
-}
-.pills-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.45);
+/* Utilities */
+@layer utilities {
+  .hidden-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .hidden-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* ── Bottom nav horizontal pill scroller — minimal thin scrollbar ───────── */
+  .pills-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+  .pills-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+  .pills-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .pills-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 10px;
+  }
+  .pills-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.45);
+  }
 }
 
 /* ── Global reset ──────────────────────────────────────────────────────────── */
